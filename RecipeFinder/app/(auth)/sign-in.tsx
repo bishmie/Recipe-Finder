@@ -7,14 +7,20 @@ import {
   ScrollView, 
   TextInput, 
   TouchableOpacity, 
+  StyleSheet,
 } from "react-native"; 
 import { useRouter } from "expo-router"; 
 import { useState } from "react"; 
 import { authStyles } from "../../assets/styles/auth.styles"; 
 import { Image } from "expo-image"; 
 import { COLORS } from "../../constants/colors"; 
-import { Ionicons } from "@expo/vector-icons"; 
-import { signInWithEmail } from "../../services/firebase";
+import { Ionicons, FontAwesome } from "@expo/vector-icons"; 
+import { 
+  signInWithEmail,
+  signInWithGoogle,
+  signInWithFacebook,
+  signInWithTwitter 
+} from "../../services/firebase";
 
 const SignInScreen = () => { 
   const router = useRouter(); 
@@ -33,7 +39,7 @@ const SignInScreen = () => {
       await signInWithEmail(email, password);
       
       // Navigate to home screen on successful login
-      router.replace("/");
+      router.replace("/(tabs)" as any);
     } catch (err: any) { 
       Alert.alert("Error", err.message || "Failed to sign in"); 
       console.error(JSON.stringify(err, null, 2)); 
@@ -113,10 +119,58 @@ const SignInScreen = () => {
               </Text> 
             </TouchableOpacity> 
 
+            {/* Social Media Login Options */}
+            <View style={styles.socialContainer}>
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.socialButtonsRow}>
+                <TouchableOpacity 
+                  style={styles.socialButton} 
+                  onPress={async () => {
+                    try {
+                      await signInWithGoogle();
+                      router.replace('/(tabs)' as any);
+                    } catch (error: any) {
+                      Alert.alert('Error', error.message);
+                    }
+                  }}
+                >
+                  <FontAwesome name="google" size={24} color="#DB4437" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.socialButton}
+                  onPress={async () => {
+                    try {
+                      await signInWithFacebook();
+                      router.replace('/(tabs)' as any);
+                    } catch (error: any) {
+                      Alert.alert('Error', error.message);
+                    }
+                  }}
+                >
+                  <FontAwesome name="facebook" size={24} color="#4267B2" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.socialButton}
+                  onPress={async () => {
+                    try {
+                      await signInWithTwitter();
+                      router.replace('/(tabs)' as any);
+                    } catch (error: any) {
+                      Alert.alert('Error', error.message);
+                    }
+                  }}
+                >
+                  <FontAwesome name="twitter" size={24} color="#1DA1F2" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* Sign Up Link */} 
             <TouchableOpacity 
               style={authStyles.linkContainer} 
-              onPress={() => router.push("/sign-up")} 
+              onPress={() => router.push("/(auth)/sign-up" as any)} 
             > 
               <Text style={authStyles.linkText}> 
                 Don't have an account? <Text style={authStyles.link}>Sign Up</Text> 
@@ -128,5 +182,38 @@ const SignInScreen = () => {
     </View> 
   ); 
 }; 
+
+const styles = StyleSheet.create({
+  socialContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+    width: '100%'
+  },
+  orText: {
+    color: COLORS.textLight,
+    marginVertical: 10,
+    fontSize: 14
+  },
+  socialButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: 10
+  },
+  socialButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4
+  }
+});
 
 export default SignInScreen;

@@ -7,15 +7,22 @@ import {
   ScrollView, 
   TextInput, 
   TouchableOpacity, 
+  StyleSheet,
 } from "react-native"; 
 import { useRouter } from "expo-router"; 
 import { useState } from "react"; 
 import { authStyles } from "../../assets/styles/auth.styles"; 
 import { Image } from "expo-image"; 
 import { COLORS } from "../../constants/colors"; 
-import { Ionicons } from "@expo/vector-icons"; 
+import { Ionicons, FontAwesome } from "@expo/vector-icons"; 
 import VerifyEmail from "./verify-email"; 
-import { signUpWithEmail, sendVerificationEmail } from "../../services/firebase";
+import { 
+  signUpWithEmail, 
+  sendVerificationEmail,
+  signInWithGoogle,
+  signInWithFacebook,
+  signInWithTwitter
+} from "../../services/firebase";
 
 const SignUpScreen = () => { 
   const router = useRouter(); 
@@ -121,6 +128,54 @@ const SignUpScreen = () => {
               </Text> 
             </TouchableOpacity> 
 
+            {/* Social Media Login Options */}
+            <View style={styles.socialContainer}>
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.socialButtonsRow}>
+                <TouchableOpacity 
+                  style={styles.socialButton} 
+                  onPress={async () => {
+                    try {
+                      await signInWithGoogle();
+                      router.replace('/(tabs)' as any);
+                    } catch (error: any) {
+                      Alert.alert('Error', error.message);
+                    }
+                  }}
+                >
+                  <FontAwesome name="google" size={24} color="#DB4437" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.socialButton}
+                  onPress={async () => {
+                    try {
+                      await signInWithFacebook();
+                      router.replace('/(tabs)' as any);
+                    } catch (error: any) {
+                      Alert.alert('Error', error.message);
+                    }
+                  }}
+                >
+                  <FontAwesome name="facebook" size={24} color="#4267B2" />
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.socialButton}
+                  onPress={async () => {
+                    try {
+                      await signInWithTwitter();
+                      router.replace('/(tabs)' as any);
+                    } catch (error: any) {
+                      Alert.alert('Error', error.message);
+                    }
+                  }}
+                >
+                  <FontAwesome name="twitter" size={24} color="#1DA1F2" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* Sign In Link */} 
             <TouchableOpacity style={authStyles.linkContainer} onPress={() => router.back()}> 
               <Text style={authStyles.linkText}> 
@@ -133,5 +188,38 @@ const SignUpScreen = () => {
     </View> 
   ); 
 }; 
+
+const styles = StyleSheet.create({
+  socialContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+    width: '100%'
+  },
+  orText: {
+    color: COLORS.textLight,
+    marginVertical: 10,
+    fontSize: 14
+  },
+  socialButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: 10
+  },
+  socialButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4
+  }
+});
 
 export default SignUpScreen;
