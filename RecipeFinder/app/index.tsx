@@ -10,23 +10,19 @@ export default function Index() {
   const { user, loading } = useAuth();
 
   useEffect(() => {
-    // Wait for splash screen animation to complete
     const timer = setTimeout(() => {
       if (!loading) {
         if (user) {
-          // User is authenticated, navigate to tabs
-          router.replace("/(tabs)" as any);
+          router.replace("/home");
         } else {
-          // User is not authenticated, navigate to sign in
-          router.replace("/(auth)/sign-in" as any);
+          router.replace("/sign-in");
         }
       }
-    }, 2500); // Match the splash screen animation duration
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, [loading, user, router]);
 
-  // Show splash screen initially
   return (
     <View style={styles.container}>
       <SplashScreen />
@@ -37,5 +33,5 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  }
+  },
 });
