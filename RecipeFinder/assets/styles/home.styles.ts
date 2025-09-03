@@ -20,6 +20,27 @@ export const homeStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.card,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: COLORS.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  titleSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    alignItems: "center",
+  },
   welcomeText: {
     fontSize: 32,
     fontWeight: "800",
