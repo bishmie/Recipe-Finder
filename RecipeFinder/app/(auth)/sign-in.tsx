@@ -39,7 +39,7 @@ const SignInScreen = () => {
       await signInWithEmail(email, password);
       
       // Navigate to home screen on successful login
-      router.replace("/(tabs)" as any);
+      router.replace("/home");
     } catch (err: any) { 
       Alert.alert("Error", err.message || "Failed to sign in"); 
       console.error(JSON.stringify(err, null, 2)); 
@@ -128,7 +128,7 @@ const SignInScreen = () => {
                   onPress={async () => {
                     try {
                       await signInWithGoogle();
-                      router.replace('/(tabs)' as any);
+                      router.replace("/home");
                     } catch (error: any) {
                       Alert.alert('Error', error.message);
                     }
@@ -142,7 +142,7 @@ const SignInScreen = () => {
                   onPress={async () => {
                     try {
                       await signInWithFacebook();
-                      router.replace('/(tabs)' as any);
+                      router.replace("/home");
                     } catch (error: any) {
                       Alert.alert('Error', error.message);
                     }
@@ -156,7 +156,7 @@ const SignInScreen = () => {
                   onPress={async () => {
                     try {
                       await signInWithTwitter();
-                      router.replace('/(tabs)' as any);
+                      router.replace("/home");
                     } catch (error: any) {
                       Alert.alert('Error', error.message);
                     }

@@ -26,7 +26,7 @@ const VerifyEmail: React.FC<VerifyEmailProps> = ({ email, onBack }) => {
       // In a real implementation, you would use Firebase's verification methods
       // For now, we'll just simulate success
       Alert.alert('Success', 'Email verified successfully', [
-        { text: 'OK', onPress: () => router.replace('/') }
+        { text: 'OK', onPress: () => router.replace('/(tabs)' as any) }
       ]);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to verify email');

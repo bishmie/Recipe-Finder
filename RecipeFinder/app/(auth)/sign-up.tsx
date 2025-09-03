@@ -137,7 +137,7 @@ const SignUpScreen = () => {
                   onPress={async () => {
                     try {
                       await signInWithGoogle();
-                      router.replace('/(tabs)' as any);
+                      router.replace("/home");
                     } catch (error: any) {
                       Alert.alert('Error', error.message);
                     }
@@ -151,7 +151,7 @@ const SignUpScreen = () => {
                   onPress={async () => {
                     try {
                       await signInWithFacebook();
-                      router.replace('/(tabs)' as any);
+                      router.replace("/home");
                     } catch (error: any) {
                       Alert.alert('Error', error.message);
                     }
@@ -165,7 +165,7 @@ const SignUpScreen = () => {
                   onPress={async () => {
                     try {
                       await signInWithTwitter();
-                      router.replace('/(tabs)' as any);
+                      router.replace("/home");
                     } catch (error: any) {
                       Alert.alert('Error', error.message);
                     }
@@ -177,7 +177,7 @@ const SignUpScreen = () => {
             </View>
 
             {/* Sign In Link */} 
-            <TouchableOpacity style={authStyles.linkContainer} onPress={() => router.back()}> 
+            <TouchableOpacity style={authStyles.linkContainer} onPress={() => router.replace("/sign-in")}> 
               <Text style={authStyles.linkText}> 
                 Already have an account? <Text style={authStyles.link}>Sign In</Text> 
               </Text> 
