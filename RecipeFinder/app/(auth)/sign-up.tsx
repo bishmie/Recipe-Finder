@@ -10,7 +10,14 @@ import {
   StyleSheet,
 } from "react-native"; 
 import { useRouter } from "expo-router"; 
-import { useState } from "react"; 
+import { useState, useEffect } from "react";
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withSpring, 
+  withTiming,
+  runOnJS
+} from "react-native-reanimated"; 
 import { authStyles } from "../../assets/styles/auth.styles"; 
 import { Image } from "expo-image"; 
 import { COLORS } from "../../constants/colors"; 
@@ -30,7 +37,54 @@ const SignUpScreen = () => {
   const [password, setPassword] = useState(""); 
   const [showPassword, setShowPassword] = useState(false); 
   const [loading, setLoading] = useState(false); 
-  const [pendingVerification, setPendingVerification] = useState(false); 
+  const [pendingVerification, setPendingVerification] = useState(false);
+
+  // Animation values
+  const logoOpacity = useSharedValue(0);
+  const logoScale = useSharedValue(0.5);
+  const formOpacity = useSharedValue(0);
+  const formTranslateY = useSharedValue(50);
+  const buttonScale = useSharedValue(1);
+
+  useEffect(() => {
+    // Logo animation
+    logoOpacity.value = withTiming(1, { duration: 600 });
+    logoScale.value = withSpring(1, { damping: 15, stiffness: 150 });
+    
+    // Form animation with delay
+    setTimeout(() => {
+      formOpacity.value = withTiming(1, { duration: 500 });
+      formTranslateY.value = withSpring(0, { damping: 15, stiffness: 150 });
+    }, 300);
+  }, []);
+
+  const logoAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: logoOpacity.value,
+      transform: [{ scale: logoScale.value }],
+    };
+  });
+
+  const formAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: formOpacity.value,
+      transform: [{ translateY: formTranslateY.value }],
+    };
+  });
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: buttonScale.value }],
+    };
+  });
+
+  const handleButtonPressIn = () => {
+    buttonScale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
+  };
+
+  const handleButtonPressOut = () => {
+    buttonScale.value = withSpring(1, { damping: 15, stiffness: 300 });
+  }; 
 
   const handleSignUp = async () => { 
     if (!email || !password) return Alert.alert("Error", "Please fill in all fields"); 
@@ -69,17 +123,18 @@ const SignUpScreen = () => {
           showsVerticalScrollIndicator={false} 
         > 
           {/* Image Container */} 
-          <View style={authStyles.imageContainer}> 
+          <Animated.View style={[authStyles.imageContainer, logoAnimatedStyle]}> 
             <Image 
               source={require("../../assets/images/i2.png")} 
               style={authStyles.image} 
               contentFit="contain" 
             /> 
-          </View> 
+          </Animated.View> 
 
-          <Text style={authStyles.title}>Create Account</Text> 
+          <Animated.View style={formAnimatedStyle}>
+            <Text style={authStyles.title}>Create Account</Text> 
 
-          <View style={authStyles.formContainer}> 
+            <View style={authStyles.formContainer}> 
             {/* Email Input */} 
             <View style={authStyles.inputContainer}> 
               <TextInput 
@@ -117,16 +172,20 @@ const SignUpScreen = () => {
             </View> 
 
             {/* Sign Up Button */} 
-            <TouchableOpacity 
-              style={[authStyles.authButton, loading && authStyles.buttonDisabled]} 
-              onPress={handleSignUp} 
-              disabled={loading} 
-              activeOpacity={0.8} 
-            > 
-              <Text style={authStyles.buttonText}> 
-                {loading ? "Creating Account..." : "Sign Up"} 
-              </Text> 
-            </TouchableOpacity> 
+            <Animated.View style={buttonAnimatedStyle}>
+              <TouchableOpacity 
+                style={[authStyles.authButton, loading && authStyles.buttonDisabled]} 
+                onPress={handleSignUp} 
+                onPressIn={handleButtonPressIn}
+                onPressOut={handleButtonPressOut}
+                disabled={loading} 
+                activeOpacity={1} 
+              > 
+                <Text style={authStyles.buttonText}> 
+                  {loading ? "Creating Account..." : "Sign Up"} 
+                </Text> 
+              </TouchableOpacity>
+            </Animated.View> 
 
             {/* Social Media Login Options */}
             <View style={styles.socialContainer}>
@@ -182,7 +241,8 @@ const SignUpScreen = () => {
                 Already have an account? <Text style={authStyles.link}>Sign In</Text> 
               </Text> 
             </TouchableOpacity> 
-          </View> 
+            </View>
+          </Animated.View> 
         </ScrollView> 
       </KeyboardAvoidingView> 
     </View> 
