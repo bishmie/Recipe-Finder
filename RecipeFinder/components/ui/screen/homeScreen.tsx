@@ -25,10 +25,8 @@ interface Recipe {
   cookTime?: string;
   servings?: string;
   area?: string;
+  source?: 'firebase' | 'mealdb';
 }
-
-// Utility
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const HomeScreen: React.FC = () => {
   const router = useRouter();
@@ -44,17 +42,22 @@ const HomeScreen: React.FC = () => {
     try {
       setLoading(true);
 
-      // Get data from RecipeService instead of MealAPI
-      const categories = RecipeService.getCategories();
-      const randomRecipes = RecipeService.getRandomRecipes(12);
-      const featuredRecipe = RecipeService.getRandomRecipe();
+      // Get data from RecipeService
+      const [categories, randomRecipes, featuredRecipe] = await Promise.all([
+        RecipeService.getCategories(),
+        RecipeService.getRandomRecipes(12),
+        RecipeService.getRandomRecipe()
+      ]);
 
       setCategories(categories);
-
-      if (!selectedCategory) setSelectedCategory(categories[0].name);
+      if (!selectedCategory && categories.length > 0) {
+        setSelectedCategory(categories[0].name);
+      }
 
       setRecipes(randomRecipes);
-      setFeaturedRecipe(featuredRecipe);
+      if (featuredRecipe) {
+        setFeaturedRecipe(featuredRecipe);
+      }
     } catch (error) {
       console.log("Error loading the data", error);
     } finally {
@@ -64,7 +67,7 @@ const HomeScreen: React.FC = () => {
 
   const loadCategoryData = async (category: string) => {
     try {
-      const recipes = RecipeService.getRecipesByCategory(category);
+      const recipes = await RecipeService.getRecipesByCategory(category);
       setRecipes(recipes);
     } catch (error) {
       console.error("Error loading category data:", error);
@@ -79,7 +82,6 @@ const HomeScreen: React.FC = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // await sleep(2000);
     await loadData();
     setRefreshing(false);
   };
@@ -89,7 +91,7 @@ const HomeScreen: React.FC = () => {
   }, []);
 
   if (loading && !refreshing)
-    return <LoadingSpinner message="Loading delicions recipes..." />;
+    return <LoadingSpinner message="Loading delicious recipes..." />;
 
   return (
     <View style={homeStyles.container}>
@@ -126,7 +128,6 @@ const HomeScreen: React.FC = () => {
               style={homeStyles.featuredCard}
               activeOpacity={0.9}
               onPress={() => (router.push as any)(`/recipe/${featuredRecipe.id}`)}
-
             >
               <View style={homeStyles.featuredImageContainer}>
                 <Image
@@ -137,7 +138,9 @@ const HomeScreen: React.FC = () => {
                 />
                 <View style={homeStyles.featuredOverlay}>
                   <View style={homeStyles.featuredBadge}>
-                    <Text style={homeStyles.featuredBadgeText}>Featured</Text>
+                    <Text style={homeStyles.featuredBadgeText}>
+                      {featuredRecipe.source === 'firebase' ? 'User Recipe' : 'Featured'}
+                    </Text>
                   </View>
 
                   <View style={homeStyles.featuredContent}>
