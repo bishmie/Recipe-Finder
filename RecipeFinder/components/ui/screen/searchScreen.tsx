@@ -1,5 +1,5 @@
 import { View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from "react-native";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { searchStyles } from "../../../assets/styles/search.styles";
 import { COLORS } from "../../../constants/colors";
@@ -16,6 +16,7 @@ interface Recipe {
   cookTime?: string;
   servings?: string;
   area?: string;
+  source?: 'firebase' | 'mealdb';
 }
 
 export default function SearchScreen() {
@@ -27,44 +28,69 @@ export default function SearchScreen() {
   // Quick filter options
   const quickFilters = ["All", "Breakfast", "Lunch", "Dinner", "Dessert"];
 
+  // Search for recipes
+  const searchRecipes = useCallback(async (query: string) => {
+    try {
+      setLoading(true);
+      const results = await RecipeService.searchRecipes(query);
+      setRecipes(results);
+    } catch (error) {
+      console.error('Error searching recipes:', error);
+      setRecipes([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Load initial recipes
+  const loadInitialRecipes = useCallback(async () => {
+    try {
+      setLoading(true);
+      const recipes = await RecipeService.getRandomRecipes(12);
+      setRecipes(recipes);
+    } catch (error) {
+      console.error('Error loading initial recipes:', error);
+      setRecipes([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Search for recipes when query changes
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      // Show popular recipes when no search query
-      setRecipes(RecipeService.getRandomRecipes(12));
-      return;
-    }
-
-    setLoading(true);
-    
-    // Simulate search delay
     const timer = setTimeout(() => {
-      const results = RecipeService.searchRecipes(searchQuery);
-      setRecipes(results);
-      setLoading(false);
+      if (searchQuery.trim() === "") {
+        loadInitialRecipes();
+      } else {
+        searchRecipes(searchQuery);
+      }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, searchRecipes, loadInitialRecipes]);
 
   // Filter recipes by category
-  const handleFilterChange = (filter: string) => {
+  const handleFilterChange = async (filter: string) => {
     setActiveFilter(filter);
     setLoading(true);
 
-    setTimeout(() => {
+    try {
       if (filter === "All") {
         if (searchQuery.trim() === "") {
-          setRecipes(RecipeService.getRandomRecipes(12));
+          await loadInitialRecipes();
         } else {
-          setRecipes(RecipeService.searchRecipes(searchQuery));
+          await searchRecipes(searchQuery);
         }
       } else {
-        const filteredRecipes = RecipeService.getRecipesByCategory(filter);
+        const filteredRecipes = await RecipeService.getRecipesByCategory(filter);
         setRecipes(filteredRecipes);
       }
+    } catch (error) {
+      console.error('Error filtering recipes:', error);
+      setRecipes([]);
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   // Clear search input
