@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getAuth, 
+  initializeAuth,
+  getAuth,
   createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   sendEmailVerification, 
@@ -10,9 +11,11 @@ import {
   TwitterAuthProvider, 
   signOut,
   onAuthStateChanged,
-  User 
+  User, 
+  Auth
 } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { Platform } from 'react-native';
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -29,7 +32,26 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+
+// Initialize Auth with proper configuration for Expo
+let auth: Auth;
+try {
+  // For React Native (Expo), use initializeAuth without custom persistence
+  // AsyncStorage persistence is handled automatically by Firebase in React Native
+  if (Platform.OS !== 'web') {
+    auth = initializeAuth(app, {
+      // Expo handles persistence automatically
+    });
+  } else {
+    // For web, use standard getAuth
+    auth = getAuth(app);
+  }
+} catch (error) {
+  // Fallback to default auth if initialization fails
+  console.warn('Using default auth initialization:', (error as Error).message);
+  auth = getAuth(app);
+}
+
 const db = getFirestore(app);
 
 // Initialize providers
@@ -60,6 +82,7 @@ export const sendVerificationEmail = async (user: User): Promise<void> => {
 export const signInWithEmail = async (email: string, password: string): Promise<User> => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    console.log(userCredential.user.uid);
     return userCredential.user;
   } catch (error) {
     throw error;
