@@ -1,4 +1,7 @@
-// Local recipe service to replace external API calls
+// Recipe service that supports both MealDB API and Firebase
+import * as MealAPI from './mealAPI';
+import * as FirebaseRecipeService from './firebaseRecipeService';
+import { auth } from './firebase';
 
 // Types
 export interface Ingredient {
@@ -17,6 +20,12 @@ export interface Recipe {
   category?: string;
   ingredients: Ingredient[];
   instructions: string[];
+  videoUrl?: string; // YouTube video URL
+  userId?: string; // Owner of the recipe
+  createdAt?: Date; // Timestamp
+  updatedAt?: Date; // Timestamp
+  source?: 'firebase' | 'mealdb'; // Source of the recipe data
+  status?: 'pending' | 'approved' | 'rejected'; // Recipe approval status
 }
 
 export interface Category {
@@ -26,293 +35,268 @@ export interface Category {
   description: string;
 }
 
-// Mock data for recipes
-const mockRecipes: Recipe[] = [
-  {
-    id: '1',
-    title: 'Fish Pie',
-    image: 'https://www.themealdb.com/images/media/meals/ysxwuq1487323065.jpg',
-    description: 'A classic British dish made with white fish in a creamy sauce, topped with mashed potatoes.',
-    cookTime: '30 minutes',
-    servings: '4',
-    area: 'British',
-    category: 'Seafood',
-    ingredients: [
-      { name: 'Floury Potatoes', measure: '1kg' },
-      { name: 'Butter', measure: '50g' },
-      { name: 'Milk', measure: '4 tbsp' },
-      { name: 'White Fish Fillets', measure: '400g' },
-      { name: 'Leek', measure: '1 finely sliced' },
-      { name: 'Dijon Mustard', measure: '2 tsp' },
-      { name: 'Creme Fraiche', measure: '100ml' },
-      { name: 'Parsley', measure: '2 tbsp chopped' },
-      { name: 'Lemon', measure: '1' },
-      { name: 'Gruyère', measure: '50g' },
-      { name: 'Green Beans', measure: '200g' }
-    ],
-    instructions: [
-      'Preheat the oven to 200°C/fan 180°C/gas mark 6.',
-      'Boil the potatoes for 15-20 mins until tender. Drain, then mash with the butter and milk. Season with salt and pepper.',
-      'Put the fish in a large frying pan with the leek and cover with cold water. Bring to a gentle simmer and cook for 5 mins until the fish flakes easily.',
-      'Carefully lift the fish onto a plate and strain the cooking liquid into a jug.',
-      'Put the frying pan back on the heat and add the mustard, crème fraîche and 100ml of the reserved cooking liquid. Bring to a gentle simmer.',
-      'Flake the fish into a baking dish, removing any bones. Add the parsley and lemon zest to the sauce, then pour over the fish.',
-      'Top with the mashed potato and sprinkle with the cheese. Bake for 25-30 mins until golden and bubbling.',
-      'Meanwhile, cook the green beans in boiling water for 3-4 mins. Serve with the fish pie.'
-    ]
-  },
-  {
-    id: '2',
-    title: 'Beef Stroganoff',
-    image: 'https://www.themealdb.com/images/media/meals/svprys1511176755.jpg',
-    description: 'A Russian dish of sautéed beef in a sauce with sour cream.',
-    cookTime: '45 minutes',
-    servings: '4',
-    area: 'Russian',
-    category: 'Beef',
-    ingredients: [
-      { name: 'Beef Fillet', measure: '500g' },
-      { name: 'Olive Oil', measure: '1 tbsp' },
-      { name: 'Onion', measure: '1 sliced' },
-      { name: 'Mushrooms', measure: '250g' },
-      { name: 'Butter', measure: '30g' },
-      { name: 'Plain Flour', measure: '1 tbsp' },
-      { name: 'Beef Stock', measure: '150ml' },
-      { name: 'Dijon Mustard', measure: '1 tsp' },
-      { name: 'Sour Cream', measure: '100ml' },
-      { name: 'Parsley', measure: '2 tbsp chopped' }
-    ],
-    instructions: [
-      'Heat the olive oil in a large frying pan, then add the sliced onion and cook for 3-4 mins until starting to soften.',
-      'Add the mushrooms and cook for a further 5 mins until the mushrooms are golden.',
-      'Remove the onion and mushrooms from the pan and set aside.',
-      'In the same pan, melt the butter, then add the beef strips and cook for 3-4 mins until browned all over.',
-      'Add the flour and cook for 1 min more.',
-      'Gradually add the stock, stirring constantly, until the mixture thickens.',
-      'Stir in the mustard and sour cream, then return the onion and mushrooms to the pan.',
-      'Simmer for 5 mins until the sauce thickens slightly, then season to taste.',
-      'Scatter with parsley and serve with rice or pasta.'
-    ]
-  },
-  {
-    id: '3',
-    title: 'Chicken Tikka Masala',
-    image: 'https://www.themealdb.com/images/media/meals/qptpvt1487339892.jpg',
-    description: 'A popular Indian dish of marinated chicken in a spiced curry sauce.',
-    cookTime: '50 minutes',
-    servings: '4',
-    area: 'Indian',
-    category: 'Chicken',
-    ingredients: [
-      { name: 'Chicken Breasts', measure: '4' },
-      { name: 'Yogurt', measure: '150g' },
-      { name: 'Lemon Juice', measure: '2 tbsp' },
-      { name: 'Garam Masala', measure: '2 tsp' },
-      { name: 'Ground Cumin', measure: '1 tsp' },
-      { name: 'Ground Coriander', measure: '1 tsp' },
-      { name: 'Paprika', measure: '1 tsp' },
-      { name: 'Turmeric', measure: '1/2 tsp' },
-      { name: 'Onion', measure: '2 chopped' },
-      { name: 'Garlic', measure: '3 cloves minced' },
-      { name: 'Ginger', measure: '2cm piece grated' },
-      { name: 'Tomato Puree', measure: '2 tbsp' },
-      { name: 'Chopped Tomatoes', measure: '400g can' },
-      { name: 'Double Cream', measure: '150ml' },
-      { name: 'Fresh Coriander', measure: 'handful chopped' }
-    ],
-    instructions: [
-      'In a bowl, mix the yogurt, lemon juice, garam masala, cumin, coriander, paprika, and turmeric. Add the chicken and coat well. Cover and refrigerate for at least 1 hour.',
-      'Preheat the grill to high. Thread the chicken onto skewers and grill for 8-10 mins until charred and cooked through.',
-      'Meanwhile, heat oil in a large pan. Add the onions and cook for 5 mins until softened.',
-      'Add the garlic and ginger and cook for 1 min more.',
-      'Add the tomato puree and cook for 1 min, then add the chopped tomatoes and 100ml water.',
-      'Simmer for 15 mins until the sauce thickens.',
-      'Add the cream and simmer for 5 mins more.',
-      'Add the grilled chicken to the sauce and heat through.',
-      'Scatter with fresh coriander and serve with rice and naan bread.'
-    ]
-  },
-  {
-    id: '4',
-    title: 'Apple Crumble',
-    image: 'https://www.themealdb.com/images/media/meals/wxywrq1468235067.jpg',
-    description: 'A classic British dessert with stewed apples topped with a crumbly mixture.',
-    cookTime: '40 minutes',
-    servings: '6',
-    area: 'British',
-    category: 'Dessert',
-    ingredients: [
-      { name: 'Bramley Apples', measure: '4 large' },
-      { name: 'Caster Sugar', measure: '100g' },
-      { name: 'Lemon', measure: '1 zested' },
-      { name: 'Cinnamon', measure: '1 tsp' },
-      { name: 'Plain Flour', measure: '200g' },
-      { name: 'Butter', measure: '100g cold cubed' },
-      { name: 'Demerara Sugar', measure: '100g' },
-      { name: 'Rolled Oats', measure: '50g' }
-    ],
-    instructions: [
-      'Preheat the oven to 190°C/fan 170°C/gas mark 5.',
-      'Peel, core and slice the apples into a large ovenproof dish.',
-      'Add the caster sugar, lemon zest and cinnamon, and mix well.',
-      'For the crumble topping, mix the flour and butter together until it resembles breadcrumbs.',
-      'Stir in the demerara sugar and oats.',
-      'Sprinkle the crumble mixture over the apples and bake for 30-35 mins until golden and bubbling.',
-      'Serve with custard or ice cream.'
-    ]
-  },
-  {
-    id: '5',
-    title: 'Lamb Biryani',
-    image: 'https://www.themealdb.com/images/media/meals/xrttsx1487339558.jpg',
-    description: 'A fragrant Indian rice dish with tender lamb in aromatic spices.',
-    cookTime: '1 hour 30 minutes',
-    servings: '6',
-    area: 'Indian',
-    category: 'Lamb',
-    ingredients: [
-      { name: 'Lamb', measure: '500g diced' },
-      { name: 'Basmati Rice', measure: '300g' },
-      { name: 'Onion', measure: '2 sliced' },
-      { name: 'Garlic', measure: '4 cloves minced' },
-      { name: 'Ginger', measure: '2cm piece grated' },
-      { name: 'Garam Masala', measure: '2 tsp' },
-      { name: 'Ground Cumin', measure: '1 tsp' },
-      { name: 'Ground Coriander', measure: '1 tsp' },
-      { name: 'Turmeric', measure: '1/2 tsp' },
-      { name: 'Cardamom Pods', measure: '6 crushed' },
-      { name: 'Cinnamon Stick', measure: '1' },
-      { name: 'Bay Leaves', measure: '2' },
-      { name: 'Natural Yogurt', measure: '150g' },
-      { name: 'Tomatoes', measure: '2 chopped' },
-      { name: 'Fresh Coriander', measure: 'handful chopped' },
-      { name: 'Fresh Mint', measure: 'handful chopped' },
-      { name: 'Saffron', measure: 'pinch' },
-      { name: 'Milk', measure: '2 tbsp warm' }
-    ],
-    instructions: [
-      'Marinate the lamb in yogurt, half the garam masala, half the cumin, half the coriander, and half the turmeric for at least 1 hour.',
-      'Soak the saffron in warm milk and set aside.',
-      'Rinse the rice until the water runs clear, then soak for 30 mins. Drain well.',
-      'Heat oil in a large pan and fry the onions until golden. Remove half and set aside.',
-      'Add the garlic and ginger to the pan and cook for 1 min.',
-      'Add the remaining spices, cardamom, cinnamon and bay leaves and cook for 1 min more.',
-      'Add the marinated lamb and cook for 5 mins until browned.',
-      'Add the tomatoes and cook for 5 mins until softened.',
-      'Add 300ml water, cover and simmer for 30 mins until the lamb is tender.',
-      'Meanwhile, cook the rice in boiling water for 5 mins until just tender. Drain well.',
-      'In a large ovenproof dish, layer half the rice, then the lamb mixture, then the remaining rice.',
-      'Drizzle over the saffron milk and scatter with the reserved fried onions, fresh coriander and mint.',
-      'Cover tightly with foil and bake at 180°C/fan 160°C/gas mark 4 for 20 mins.',
-      'Serve with raita and naan bread.'
-    ]
-  }
-];
-
-// Mock data for categories
-const mockCategories: Category[] = [
-  {
-    id: '1',
-    name: 'Beef',
-    image: 'https://www.themealdb.com/images/category/beef.png',
-    description: 'Beef is the culinary name for meat from cattle, particularly skeletal muscle.'
-  },
-  {
-    id: '2',
-    name: 'Chicken',
-    image: 'https://www.themealdb.com/images/category/chicken.png',
-    description: 'Chicken is a type of domesticated fowl, a subspecies of the red junglefowl.'
-  },
-  {
-    id: '3',
-    name: 'Dessert',
-    image: 'https://www.themealdb.com/images/category/dessert.png',
-    description: 'Dessert is a course that concludes a meal. The course usually consists of sweet foods.'
-  },
-  {
-    id: '4',
-    name: 'Lamb',
-    image: 'https://www.themealdb.com/images/category/lamb.png',
-    description: 'Lamb, hogget, and mutton are the meat of domestic sheep at different ages.'
-  },
-  {
-    id: '5',
-    name: 'Seafood',
-    image: 'https://www.themealdb.com/images/category/seafood.png',
-    description: 'Seafood is any form of sea life regarded as food by humans.'
-  }
-];
-
 // Recipe Service functions
 export const RecipeService = {
-  // Get all recipes
-  getRecipes: (): Recipe[] => {
-    return mockRecipes;
-  },
+  // Get all recipes (combines demo recipes from MealDB and user recipes from Firebase)
+  getRecipes: async (): Promise<Recipe[]> => {
+    try {
+      const [mealDbRecipes, firebaseRecipes] = await Promise.all([
+        MealAPI.getRandomMeals(5),
+        auth.currentUser ? FirebaseRecipeService.getAllRecipes() : Promise.resolve([])
+      ]);
 
-  // Get recipe by ID
-  getRecipeById: (id: string): Recipe | undefined => {
-    return mockRecipes.find(recipe => recipe.id === id);
-  },
+      // Mark the source of each recipe
+      mealDbRecipes.forEach((recipe: Recipe) => {
+        recipe.source = 'mealdb';
+      });
+      firebaseRecipes.forEach((recipe: Recipe) => {
+        recipe.source = 'firebase';
+      });
 
-  // Get recipes by category
-  getRecipesByCategory: (category: string): Recipe[] => {
-    return mockRecipes.filter(recipe => recipe.category === category);
-  },
-
-  // Get random recipes
-  getRandomRecipes: (count: number = 5): Recipe[] => {
-    const shuffled = [...mockRecipes].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-  },
-
-  // Get a random recipe for featured section
-  getRandomRecipe: (): Recipe => {
-    const randomIndex = Math.floor(Math.random() * mockRecipes.length);
-    return mockRecipes[randomIndex];
-  },
-
-  // Get all categories
-  getCategories: (): Category[] => {
-    return mockCategories;
-  },
-
-  // Search recipes by title
-  searchRecipes: (query: string): Recipe[] => {
-    const lowercaseQuery = query.toLowerCase();
-    return mockRecipes.filter(recipe => 
-      recipe.title.toLowerCase().includes(lowercaseQuery) ||
-      recipe.description.toLowerCase().includes(lowercaseQuery)
-    );
-  },
-
-  // Add a new recipe (for CRUD operations)
-  addRecipe: (recipe: Omit<Recipe, 'id'>): Recipe => {
-    const newRecipe = {
-      ...recipe,
-      id: (mockRecipes.length + 1).toString()
-    };
-    mockRecipes.push(newRecipe);
-    return newRecipe;
-  },
-
-  // Update a recipe
-  updateRecipe: (id: string, recipeData: Partial<Recipe>): Recipe | undefined => {
-    const index = mockRecipes.findIndex(recipe => recipe.id === id);
-    if (index !== -1) {
-      mockRecipes[index] = { ...mockRecipes[index], ...recipeData };
-      return mockRecipes[index];
+      return [...mealDbRecipes, ...firebaseRecipes];
+    } catch (error) {
+      console.error('Error getting recipes:', error);
+      return [];
     }
-    return undefined;
   },
 
-  // Delete a recipe
-  deleteRecipe: (id: string): boolean => {
-    const index = mockRecipes.findIndex(recipe => recipe.id === id);
-    if (index !== -1) {
-      mockRecipes.splice(index, 1);
+  // Get recipe by ID (checks both MealDB and Firebase)
+  getRecipeById: async (id: string): Promise<Recipe | undefined> => {
+    try {
+      // Try Firebase first if user is logged in
+      if (auth.currentUser) {
+        const firebaseRecipe = await FirebaseRecipeService.getRecipeById(id);
+        if (firebaseRecipe) {
+          return { ...firebaseRecipe, source: 'firebase' };
+        }
+      }
+
+      // Try MealDB if not found in Firebase
+      const mealDbRecipe = await MealAPI.getMealById(id);
+      return mealDbRecipe ? { ...mealDbRecipe, source: 'mealdb' } : undefined;
+    } catch (error) {
+      console.error('Error getting recipe by ID:', error);
+      return undefined;
+    }
+  },
+
+  // Get recipes by category (combines MealDB and Firebase results)
+  getRecipesByCategory: async (category: string): Promise<Recipe[]> => {
+    try {
+      const [mealDbRecipes, firebaseRecipes] = await Promise.all([
+        MealAPI.getMealsByCategory(category),
+        auth.currentUser ? FirebaseRecipeService.getRecipesByCategory(category) : Promise.resolve([])
+      ]);
+
+      // Mark the source of each recipe
+      mealDbRecipes.forEach((recipe: Recipe) => {
+        recipe.source = 'mealdb';
+      });
+      firebaseRecipes.forEach((recipe: Recipe) => {
+        recipe.source = 'firebase';
+      });
+
+      return [...mealDbRecipes, ...firebaseRecipes];
+    } catch (error) {
+      console.error('Error getting recipes by category:', error);
+      return [];
+    }
+  },
+
+  // ===== FIREBASE CATEGORY MANAGEMENT =====
+  
+  // Create a new category in Firebase
+  createCategory: async (category: Omit<Category, 'id'>): Promise<Category> => {
+    try {
+      return await FirebaseRecipeService.createCategory(category);
+    } catch (error) {
+      console.error('Error creating category:', error);
+      throw error;
+    }
+  },
+
+  // Get category by ID from Firebase
+  getCategoryById: async (id: string): Promise<Category | null> => {
+    try {
+      return await FirebaseRecipeService.getCategoryById(id);
+    } catch (error) {
+      console.error('Error getting category by ID:', error);
+      throw error;
+    }
+  },
+
+  // Update a category in Firebase
+  updateCategory: async (id: string, categoryData: Partial<Category>): Promise<void> => {
+    try {
+      await FirebaseRecipeService.updateCategory(id, categoryData);
+    } catch (error) {
+      console.error('Error updating category:', error);
+      throw error;
+    }
+  },
+
+  // Delete a category from Firebase
+  deleteCategory: async (id: string): Promise<void> => {
+    try {
+      await FirebaseRecipeService.deleteCategory(id);
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      throw error;
+    }
+  },
+
+  // Get random recipes (primarily from MealDB for demo content)
+  getRandomRecipes: async (count: number = 5): Promise<Recipe[]> => {
+    try {
+      const recipes = await MealAPI.getRandomMeals(count);
+      recipes.forEach((recipe: Recipe) => {
+        recipe.source = 'mealdb';
+      });
+      return recipes;
+    } catch (error) {
+      console.error('Error getting random recipes:', error);
+      return [];
+    }
+  },
+
+  // Get a random recipe for featured section (from MealDB)
+  getRandomRecipe: async (): Promise<Recipe | undefined> => {
+    try {
+      const recipes = await MealAPI.getRandomMeals(1);
+      if (recipes.length > 0) {
+        const recipe: Recipe = recipes[0];
+        recipe.source = 'mealdb';
+        return recipe;
+      }
+      return undefined;
+    } catch (error) {
+      console.error('Error getting random recipe:', error);
+      return undefined;
+    }
+  },
+
+  // Get all categories (combines MealDB and Firebase categories)
+  getCategories: async (): Promise<Category[]> => {
+    try {
+      const [mealDbCategories, firebaseCategories] = await Promise.all([
+        MealAPI.getMealCategories(),
+        FirebaseRecipeService.getAllCategories()
+      ]);
+
+      return [...mealDbCategories, ...firebaseCategories];
+    } catch (error) {
+      console.error('Error getting categories:', error);
+      return [];
+    }
+  },
+
+  // Search recipes (combines results from both sources)
+  searchRecipes: async (query: string): Promise<Recipe[]> => {
+    try {
+      const [mealDbRecipes, firebaseRecipes] = await Promise.all([
+        MealAPI.searchMealsByName(query),
+        auth.currentUser ? FirebaseRecipeService.searchRecipes(query) : Promise.resolve([])
+      ]);
+
+      // Mark the source of each recipe
+      mealDbRecipes.forEach((recipe: Recipe) => {
+        recipe.source = 'mealdb';
+      });
+      firebaseRecipes.forEach((recipe: Recipe) => {
+        recipe.source = 'firebase';
+      });
+
+      return [...mealDbRecipes, ...firebaseRecipes];
+    } catch (error) {
+      console.error('Error searching recipes:', error);
+      return [];
+    }
+  },
+
+  // CRUD operations (Firebase only)
+  addRecipe: async (recipe: Omit<Recipe, 'id'>): Promise<Recipe | undefined> => {
+    try {
+      if (!auth.currentUser) throw new Error('User must be logged in to add recipes');
+      return await FirebaseRecipeService.createRecipe(recipe);
+    } catch (error) {
+      console.error('Error adding recipe:', error);
+      return undefined;
+    }
+  },
+
+  updateRecipe: async (id: string, recipeData: Partial<Recipe>): Promise<boolean> => {
+    try {
+      if (!auth.currentUser) throw new Error('User must be logged in to update recipes');
+      await FirebaseRecipeService.updateRecipe(id, recipeData);
       return true;
+    } catch (error) {
+      console.error('Error updating recipe:', error);
+      return false;
     }
-    return false;
+  },
+
+  deleteRecipe: async (id: string): Promise<boolean> => {
+    try {
+      if (!auth.currentUser) throw new Error('User must be logged in to delete recipes');
+      await FirebaseRecipeService.deleteRecipe(id);
+      return true;
+    } catch (error) {
+      console.error('Error deleting recipe:', error);
+      return false;
+    }
+  },
+
+  // === ADMIN FUNCTIONS FOR PENDING RECIPE MANAGEMENT ===
+  
+  // Get all pending recipes (admin only)
+  getPendingRecipes: async (): Promise<Recipe[]> => {
+    try {
+      return await FirebaseRecipeService.getPendingRecipes();
+    } catch (error) {
+      console.error('Error getting pending recipes:', error);
+      return [];
+    }
+  },
+
+  // Approve a pending recipe (admin only)
+  approveRecipe: async (id: string): Promise<boolean> => {
+    try {
+      await FirebaseRecipeService.approveRecipe(id);
+      return true;
+    } catch (error) {
+      console.error('Error approving recipe:', error);
+      return false;
+    }
+  },
+
+  // Reject a pending recipe (admin only)
+  rejectRecipe: async (id: string): Promise<boolean> => {
+    try {
+      await FirebaseRecipeService.rejectRecipe(id);
+      return true;
+    } catch (error) {
+      console.error('Error rejecting recipe:', error);
+      return false;
+    }
+  },
+
+  // Get all recipes with any status (admin only)
+  getAllRecipesAdmin: async (): Promise<Recipe[]> => {
+    try {
+      return await FirebaseRecipeService.getAllRecipesAdmin();
+    } catch (error) {
+      console.error('Error getting all recipes (admin):', error);
+      return [];
+    }
+  },
+
+  // Get all user's recipes regardless of status (for user's own view)
+  getUserRecipesAll: async (userId: string): Promise<Recipe[]> => {
+    try {
+      return await FirebaseRecipeService.getUserRecipesAll(userId);
+    } catch (error) {
+      console.error('Error getting all user recipes:', error);
+      return [];
+    }
   }
 };
