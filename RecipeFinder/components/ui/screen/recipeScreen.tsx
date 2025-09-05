@@ -21,25 +21,29 @@ export default function RecipeScreen() {
 
   // Load recipe data
   React.useEffect(() => {
-    if (!id) {
-      setError('Recipe ID is missing');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const recipeData = RecipeService.getRecipeById(id);
-      if (!recipeData) {
-        setError('Recipe not found');
-      } else {
-        setRecipe(recipeData);
+    const loadRecipe = async () => {
+      if (!id) {
+        setError('Recipe ID is missing');
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setError('Failed to load recipe');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+
+      try {
+        const recipeData = await RecipeService.getRecipeById(id);
+        if (!recipeData) {
+          setError('Recipe not found');
+        } else {
+          setRecipe(recipeData);
+        }
+      } catch (err) {
+        setError('Failed to load recipe');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRecipe();
   }, [id]);
 
   // Toggle step completion
@@ -76,7 +80,11 @@ export default function RecipeScreen() {
 
   // Handle back navigation
   const handleBack = () => {
-    router.back();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push('/(tabs)/home');
+    }
   };
 
   // Error state
@@ -109,10 +117,13 @@ export default function RecipeScreen() {
     );
   }
 
-  // Get YouTube video ID from a URL (mock function)
+  // Get YouTube video ID from a URL
   const getYoutubeVideoId = () => {
-    // In a real app, you would extract this from recipe.videoUrl
-    return 'dA0VGEbbw4g'; // Example Fish Pie video
+    if (!recipe.videoUrl) return null;
+    
+    // Extract video ID from YouTube URL
+    const match = recipe.videoUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    return match ? match[1] : null;
   };
 
   return (
@@ -194,26 +205,28 @@ export default function RecipeScreen() {
             </View>
           </View>
 
-          {/* Video Tutorial Section */}
-          <View style={recipeDetailStyles.sectionContainer}>
-            <View style={recipeDetailStyles.sectionTitleRow}>
-              <View style={[recipeDetailStyles.sectionIcon, { backgroundColor: '#FF0000' + '20' }]}>
-                <Ionicons name="videocam-outline" size={18} color="#FF0000" />
+          {/* Video Tutorial Section - Only show if video URL exists */}
+          {recipe.videoUrl && getYoutubeVideoId() && (
+            <View style={recipeDetailStyles.sectionContainer}>
+              <View style={recipeDetailStyles.sectionTitleRow}>
+                <View style={[recipeDetailStyles.sectionIcon, { backgroundColor: '#FF0000' + '20' }]}>
+                  <Ionicons name="videocam-outline" size={18} color="#FF0000" />
+                </View>
+                <Text style={recipeDetailStyles.sectionTitle}>Video Tutorial</Text>
               </View>
-              <Text style={recipeDetailStyles.sectionTitle}>Video Tutorial</Text>
-            </View>
 
-            <TouchableOpacity 
-              style={recipeDetailStyles.videoCard}
-              activeOpacity={0.9}
-            >
-              <WebView
-                style={recipeDetailStyles.webview}
-                javaScriptEnabled={true}
-                source={{ uri: `https://www.youtube.com/embed/${getYoutubeVideoId()}` }}
-              />
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity 
+                style={recipeDetailStyles.videoCard}
+                activeOpacity={0.9}
+              >
+                <WebView
+                  style={recipeDetailStyles.webview}
+                  javaScriptEnabled={true}
+                  source={{ uri: `https://www.youtube.com/embed/${getYoutubeVideoId()}` }}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Ingredients Section */}
           <View style={recipeDetailStyles.sectionContainer}>
@@ -223,12 +236,12 @@ export default function RecipeScreen() {
               </View>
               <Text style={recipeDetailStyles.sectionTitle}>Ingredients</Text>
               <View style={recipeDetailStyles.countBadge}>
-                <Text style={recipeDetailStyles.countText}>{recipe.ingredients.length}</Text>
+                <Text style={recipeDetailStyles.countText}>{recipe.ingredients?.length || 0}</Text>
               </View>
             </View>
 
             <View style={recipeDetailStyles.ingredientsGrid}>
-              {recipe.ingredients.map((ingredient, index) => (
+              {recipe.ingredients?.map((ingredient, index) => (
                 <TouchableOpacity 
                   key={index} 
                   style={recipeDetailStyles.ingredientCard}
@@ -260,12 +273,12 @@ export default function RecipeScreen() {
               </View>
               <Text style={recipeDetailStyles.sectionTitle}>Instructions</Text>
               <View style={recipeDetailStyles.countBadge}>
-                <Text style={recipeDetailStyles.countText}>{recipe.instructions.length}</Text>
+                <Text style={recipeDetailStyles.countText}>{recipe.instructions?.length || 0}</Text>
               </View>
             </View>
 
             <View style={recipeDetailStyles.instructionsContainer}>
-              {recipe.instructions.map((instruction, index) => (
+              {recipe.instructions?.map((instruction, index) => (
                 <View key={index} style={recipeDetailStyles.instructionCard}>
                   <View 
                     style={[
