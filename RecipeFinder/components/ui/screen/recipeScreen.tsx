@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
-import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { COLORS } from '../../../constants/colors';
 import { recipeDetailStyles } from '../../../assets/styles/recipe-detail.styles';
-import { RecipeService, Recipe, Ingredient } from '../../../services/recipeService';
+import { COLORS } from '../../../constants/colors';
+import { Recipe, RecipeService } from '../../../services/recipeService';
 
 export default function RecipeScreen() {
   const router = useRouter();
@@ -35,8 +35,8 @@ export default function RecipeScreen() {
         } else {
           setRecipe(recipeData);
         }
-      } catch (err) {
-        setError('Failed to load recipe');
+      } catch (err: any) {
+        setError(`Failed to load recipe: ${err?.message || 'Unknown error'}`);
         console.error(err);
       } finally {
         setLoading(false);
@@ -241,27 +241,33 @@ export default function RecipeScreen() {
             </View>
 
             <View style={recipeDetailStyles.ingredientsGrid}>
-              {recipe.ingredients?.map((ingredient, index) => (
-                <TouchableOpacity 
-                  key={index} 
-                  style={recipeDetailStyles.ingredientCard}
-                  onPress={() => toggleIngredientChecked(index)}
-                  activeOpacity={0.8}
-                >
-                  <View style={recipeDetailStyles.ingredientNumber}>
-                    <Text style={recipeDetailStyles.ingredientNumberText}>{index + 1}</Text>
-                  </View>
-                  <Text style={recipeDetailStyles.ingredientText}>
-                    {ingredient.name} {ingredient.measure ? `(${ingredient.measure})` : ''}
-                  </Text>
-                  <Ionicons 
-                    name={checkedIngredients.has(index) ? "checkmark-circle" : "checkmark-circle-outline"} 
-                    size={24} 
-                    color={COLORS.primary}
-                    style={checkedIngredients.has(index) ? {} : recipeDetailStyles.ingredientCheck}
-                  />
-                </TouchableOpacity>
-              ))}
+              {recipe.ingredients && recipe.ingredients.length > 0 ? (
+                recipe.ingredients.map((ingredient, index) => (
+                  <TouchableOpacity 
+                    key={index} 
+                    style={recipeDetailStyles.ingredientCard}
+                    onPress={() => toggleIngredientChecked(index)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={recipeDetailStyles.ingredientNumber}>
+                      <Text style={recipeDetailStyles.ingredientNumberText}>{index + 1}</Text>
+                    </View>
+                    <Text style={recipeDetailStyles.ingredientText}>
+                      {ingredient?.name || 'Unknown ingredient'} {ingredient?.measure ? `(${ingredient.measure})` : ''}
+                    </Text>
+                    <Ionicons 
+                      name={checkedIngredients.has(index) ? "checkmark-circle" : "checkmark-circle-outline"} 
+                      size={24} 
+                      color={COLORS.primary}
+                      style={checkedIngredients.has(index) ? {} : recipeDetailStyles.ingredientCheck}
+                    />
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={recipeDetailStyles.ingredientCard}>
+                  <Text style={recipeDetailStyles.ingredientText}>No ingredients available</Text>
+                </View>
+              )}
             </View>
           </View>
 
