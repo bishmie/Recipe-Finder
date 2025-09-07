@@ -1,8 +1,13 @@
 import { View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../constants/colors";
+import { ReactNode } from "react";
 
-const SafeScreen = ({ children }:any) => {
+interface SafeScreenProps {
+  children: ReactNode;
+}
+
+const SafeScreen = ({ children }: SafeScreenProps) => {
   const insets = useSafeAreaInsets();
 
   return (
