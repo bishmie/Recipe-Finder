@@ -17,11 +17,9 @@ import {
 import { getFirestore } from 'firebase/firestore';
 import { Platform } from 'react-native';
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+
 const firebaseConfig = {
-  // Add your Firebase configuration here
-  // You'll need to replace these with your actual Firebase project details
+
    apiKey: "AIzaSyD0hgZAr6M7YGhz1gUSd6AOtnIGZDPRHr8",
   authDomain: "reactnative-recipefinder.firebaseapp.com",
   projectId: "reactnative-recipefinder",
@@ -37,7 +35,6 @@ const app = initializeApp(firebaseConfig);
 let auth: Auth;
 try {
   // For React Native (Expo), use initializeAuth without custom persistence
-  // AsyncStorage persistence is handled automatically by Firebase in React Native
   if (Platform.OS !== 'web') {
     auth = initializeAuth(app, {
       // Expo handles persistence automatically
