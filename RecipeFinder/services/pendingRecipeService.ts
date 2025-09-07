@@ -128,10 +128,20 @@ export const PendingRecipeService = {
         Object.entries(updates).filter(([_, value]) => value !== undefined)
       );
 
-      await updateDoc(recipeRef, {
+      // If the recipe was declined and is being updated, change status back to pending
+      // so it appears in the admin dashboard again for review
+      const finalUpdates = {
         ...cleanedUpdates,
         updatedAt: Timestamp.now()
-      });
+      };
+      
+      if (recipeData.status === 'declined') {
+        finalUpdates.status = 'pending';
+        // Clear the decline reason since it's resubmitted
+        finalUpdates.declineReason = null;
+      }
+
+      await updateDoc(recipeRef, finalUpdates);
     } catch (error: any) {
       console.error('Error updating pending recipe:', error);
       throw error;
@@ -226,10 +236,48 @@ export const PendingRecipeService = {
     });
   },
 
+  // Check if a pending edit already exists for a published recipe
+  getExistingPendingEdit: async (originalRecipeId: string, userId: string): Promise<PendingRecipe | null> => {
+    try {
+      const q = query(
+        collection(db, PENDING_RECIPES_COLLECTION),
+        where('originalRecipeId', '==', originalRecipeId),
+        where('ownerId', '==', userId),
+        where('status', '==', 'pending_edit')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        return null;
+      }
+      
+      // Return the first (and should be only) pending edit
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+      
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date()
+      } as PendingRecipe;
+    } catch (error: any) {
+      console.error('Error checking for existing pending edit:', error);
+      return null;
+    }
+  },
+
   // Create a pending edit for an existing published recipe
   createPendingEdit: async (originalRecipeId: string, updates: Partial<PendingRecipe>): Promise<PendingRecipe> => {
     try {
       if (!auth.currentUser) throw new Error('User must be logged in');
+      
+      // Check if a pending edit already exists
+      const existingEdit = await PendingRecipeService.getExistingPendingEdit(originalRecipeId, auth.currentUser.uid);
+      if (existingEdit) {
+        throw new Error('A pending edit for this recipe already exists. Please edit the existing pending version instead.');
+      }
       
       // Filter out undefined values to prevent Firestore errors
       const cleanedUpdates = Object.fromEntries(
