@@ -5,23 +5,34 @@ import { useRouter } from "expo-router";
 import { COLORS } from "../constants/colors";
 import { recipeCardStyles } from "../assets/styles/home.styles";
 
-export default function RecipeCard({ recipe }: { recipe: { 
-  id: string;
-  image: string;
-  title: string;
-  description?: string;
-  cookTime?: string;
-  servings?: string;
-} }) {
+export default function RecipeCard({ recipe, onPress }: { 
+  recipe: { 
+    id: string;
+    image: string;
+    title: string;
+    description?: string;
+    cookTime?: string;
+    servings?: string;
+  };
+  onPress?: () => void;
+}) {
   const router = useRouter();
+
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+    } else {
+      (router.push as any)({
+        pathname: "/recipe/[id]",
+        params: { id: recipe.id }
+      });
+    }
+  };
 
   return (
     <TouchableOpacity
       style={recipeCardStyles.container}
-      onPress={() => (router.push as any)({
-        pathname: "/recipe/[id]",
-        params: { id: recipe.id }
-      })}
+      onPress={handlePress}
       activeOpacity={0.8}
     >
       <View style={recipeCardStyles.imageContainer}>
