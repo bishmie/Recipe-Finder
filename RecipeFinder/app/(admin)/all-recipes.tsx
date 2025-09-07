@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   TouchableOpacity,
   Alert,
@@ -13,18 +12,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { COLORS } from '../../constants/colors';
+import { COLORS, STATUS_COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
 import { RecipeService } from '../../services/recipeService';
-import { LocalRecipeService } from '../../services/localRecipeService';
-import { UserService } from '../../services/userService';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import { allRecipesStyles as styles } from '../../assets/styles/all-recipes.styles';
 import type { Recipe } from '../../services/recipeService';
-import type { LocalRecipe } from '../../services/localRecipeService';
 
 interface AdminRecipe extends Recipe {
   authorName?: string;
-  isLocal?: boolean;
 }
 
 const AllRecipesAdmin = () => {
@@ -54,78 +50,27 @@ const AllRecipesAdmin = () => {
     try {
       setLoading(true);
       
-      // Load both Firebase and local recipes
-      const [firebaseRecipes, localRecipes] = await Promise.all([
-        RecipeService.getAllRecipesAdmin(),
-        LocalRecipeService.getLocalRecipes()
-      ]);
+      // load Firebase recipes
+      const firebaseRecipes = await RecipeService.getAllRecipesAdmin();
 
-      // Convert local recipes to AdminRecipe format
-      const convertedLocalRecipes: AdminRecipe[] = await Promise.all(
-        localRecipes.map(async (localRecipe: LocalRecipe) => {
-          let authorName = 'Unknown';
-          try {
-            const userProfile = await UserService.getUserProfile(localRecipe.userId);
-            authorName = userProfile?.displayName || userProfile?.email || 'Unknown';
-          } catch (error) {
-            console.log('Could not fetch user profile for:', localRecipe.userId);
-          }
-
-          return {
-            id: localRecipe.id,
-            title: localRecipe.title,
-            description: localRecipe.description,
-            image: localRecipe.image,
-            cookTime: localRecipe.cookTime,
-            servings: localRecipe.servings,
-            category: localRecipe.category,
-            area: localRecipe.area,
-            ingredients: localRecipe.ingredients,
-            instructions: localRecipe.instructions,
-            videoUrl: localRecipe.youtubeUrl,
-            userId: localRecipe.userId,
-            createdAt: localRecipe.submittedAt,
-            updatedAt: localRecipe.submittedAt,
-            status: 'pending' as const,
-            source: 'firebase' as const,
-            authorName,
-            isLocal: true,
-          };
-        })
-      );
-
-      // Get author names for Firebase recipes
-      const firebaseRecipesWithAuthors: AdminRecipe[] = await Promise.all(
-        firebaseRecipes.map(async (recipe) => {
-          let authorName = 'Unknown';
-          if (recipe.userId) {
-            try {
-              const userProfile = await UserService.getUserProfile(recipe.userId);
-              authorName = userProfile?.displayName || userProfile?.email || 'Unknown';
-            } catch (error) {
-              console.log('Could not fetch user profile for:', recipe.userId);
-            }
-          }
+       const firebaseRecipesWithAuthors: AdminRecipe[] = firebaseRecipes.map((recipe) => {
           return {
             ...recipe,
-            authorName,
-            isLocal: false,
+            authorName: recipe.userId || 'Unknown User',
           };
-        })
-      );
+        });
 
-      // Combine and sort by creation date
-      const allRecipes = [...firebaseRecipesWithAuthors, ...convertedLocalRecipes];
-      allRecipes.sort((a, b) => {
+      // Sort by creation date
+      firebaseRecipesWithAuthors.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA; // Most recent first
       });
 
-      setRecipes(allRecipes);
-    } catch (error) {
+      setRecipes(firebaseRecipesWithAuthors);
+    } catch (error: any) {
       console.error('Error loading all recipes:', error);
-      Alert.alert('Error', 'Failed to load recipes');
+      Alert.alert('Error', error?.message || 'Failed to load recipes');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -182,13 +127,7 @@ const AllRecipesAdmin = () => {
           onPress: async () => {
             setProcessingRecipes(prev => new Set([...prev, recipeId]));
             try {
-              let success = false;
-              
-              if (recipe.isLocal) {
-                success = await LocalRecipeService.deleteLocalRecipe(recipeId);
-              } else {
-                success = await RecipeService.deleteRecipe(recipeId);
-              }
+              const success = await RecipeService.deleteRecipe(recipeId);
               
               if (success) {
                 setRecipes(prev => prev.filter(r => r.id !== recipeId));
@@ -196,9 +135,9 @@ const AllRecipesAdmin = () => {
               } else {
                 Alert.alert('Error', 'Failed to delete recipe');
               }
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting recipe:', error);
-              Alert.alert('Error', 'Failed to delete recipe');
+              Alert.alert('Error', error?.message || 'Failed to delete recipe');
             } finally {
               setProcessingRecipes(prev => {
                 const updated = new Set(prev);
@@ -239,34 +178,22 @@ const AllRecipesAdmin = () => {
           onPress: async () => {
             setProcessingRecipes(prev => new Set([...prev, recipeId]));
             try {
-              let success = false;
-              
-              if (recipe.isLocal) {
-                // Submit local recipe to Firebase and delete from local storage
-                const localRecipe = await LocalRecipeService.getLocalRecipeById(recipeId);
-                if (localRecipe) {
-                  await LocalRecipeService.submitLocalRecipeToFirebase(localRecipe);
-                  await LocalRecipeService.deleteLocalRecipe(recipeId);
-                  success = true;
-                }
-              } else {
-                success = await RecipeService.approveRecipe(recipeId);
-              }
+              const success = await RecipeService.approveRecipe(recipeId);
               
               if (success) {
                 // Update recipe status in local state
                 setRecipes(prev => prev.map(r => 
                   r.id === recipeId 
-                    ? { ...r, status: 'approved' as const, isLocal: false }
+                    ? { ...r, status: 'approved' as const }
                     : r
                 ));
                 Alert.alert('Success', 'Recipe approved successfully');
               } else {
                 Alert.alert('Error', 'Failed to approve recipe');
               }
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error approving recipe:', error);
-              Alert.alert('Error', 'Failed to approve recipe');
+              Alert.alert('Error', error?.message || 'Failed to approve recipe');
             } finally {
               setProcessingRecipes(prev => {
                 const updated = new Set(prev);
@@ -282,10 +209,10 @@ const AllRecipesAdmin = () => {
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'approved': return COLORS.success;
-      case 'pending': return COLORS.warning;
-      case 'rejected': return COLORS.error;
-      default: return COLORS.success; // Default to approved
+      case 'approved': return STATUS_COLORS.success;
+      case 'pending': return STATUS_COLORS.warning;
+      case 'rejected': return STATUS_COLORS.error;
+      default: return STATUS_COLORS.success; // Default to approved
     }
   };
 
@@ -353,12 +280,7 @@ const AllRecipesAdmin = () => {
               <Text style={styles.metadataText}>{item.servings} servings</Text>
             </View>
             
-            {item.isLocal && (
-              <View style={styles.metadataItem}>
-                <Ionicons name="phone-portrait-outline" size={16} color={COLORS.warning} />
-                <Text style={[styles.metadataText, { color: COLORS.warning }]}>Local</Text>
-              </View>
-            )}
+
           </View>
           
           <View style={styles.actionButtons}>
@@ -485,215 +407,6 @@ const AllRecipesAdmin = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.text,
-  },
-  headerRight: {
-    width: 40,
-    alignItems: 'center',
-  },
-  countBadge: {
-    backgroundColor: COLORS.primary,
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 24,
-    textAlign: 'center',
-  },
-  searchContainer: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  activeFilterButton: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  filterButtonText: {
-    fontSize: 14,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  activeFilterButtonText: {
-    color: COLORS.white,
-  },
-  listContent: {
-    padding: 16,
-  },
-  recipeCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  recipeImage: {
-    width: '100%',
-    height: 200,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  recipeContent: {
-    padding: 16,
-  },
-  recipeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  recipeTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    flex: 1,
-    marginRight: 12,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  recipeAuthor: {
-    fontSize: 14,
-    color: COLORS.textLight,
-    marginBottom: 8,
-  },
-  recipeDescription: {
-    fontSize: 14,
-    color: COLORS.text,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  recipeMetadata: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 16,
-  },
-  metadataItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metadataText: {
-    fontSize: 12,
-    color: COLORS.textLight,
-    marginLeft: 4,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
-  },
-  viewButton: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  editButton: {
-    backgroundColor: COLORS.warning,
-  },
-  approveButton: {
-    backgroundColor: COLORS.success,
-  },
-  deleteButton: {
-    backgroundColor: COLORS.error,
-  },
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyStateTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: COLORS.textLight,
-    textAlign: 'center',
-    paddingHorizontal: 40,
-    lineHeight: 24,
-  },
-});
+
 
 export default AllRecipesAdmin;
