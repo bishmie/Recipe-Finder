@@ -1,6 +1,3 @@
-// Unified Recipe service that handles all recipe operations with admin approval workflow
-// This service now uses Firebase Firestore instead of AsyncStorage for pending recipes
-
 import { PendingRecipeService, PendingRecipe, Ingredient } from './pendingRecipeService';
 import { PublishedRecipeService, PublishedRecipe, Recipe, Category } from './publishedRecipeService';
 import { AdminService, AdminAction } from './adminService';
@@ -86,13 +83,14 @@ export const RecipeService = {
   deletePendingRecipe: PendingRecipeService.deletePendingRecipe,
   getPendingRecipeById: PendingRecipeService.getPendingRecipeById,
   createPendingEdit: PendingRecipeService.createPendingEdit,
+  getExistingPendingEdit: PendingRecipeService.getExistingPendingEdit,
   listenToUserPendingRecipes: PendingRecipeService.listenToUserPendingRecipes,
 
   // Admin Operations
   getAllPendingRecipes: AdminService.getAllPendingRecipes,
   approveRecipe: AdminService.approveRecipe,
   declineRecipe: AdminService.declineRecipe,
-  deletePublishedRecipe: AdminService.deletePublishedRecipe,
+  adminDeletePublishedRecipe: AdminService.deletePublishedRecipe, // Admin-only deletion
   listenToAllPendingRecipes: AdminService.listenToAllPendingRecipes,
   getAdminActions: AdminService.getAdminActions,
   getAdminStats: AdminService.getAdminStats,
@@ -280,5 +278,4 @@ export const RecipeService = {
   }
 };
 
-// Export individual services for direct access if needed
 export { PendingRecipeService, PublishedRecipeService, AdminService };
