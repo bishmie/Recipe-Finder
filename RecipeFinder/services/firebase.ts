@@ -46,7 +46,7 @@ try {
     // For web, use standard getAuth
     auth = getAuth(app);
   }
-} catch (error) {
+} catch (error: any) {
   // Fallback to default auth if initialization fails
   console.warn('Using default auth initialization:', (error as Error).message);
   auth = getAuth(app);
@@ -64,7 +64,7 @@ export const signUpWithEmail = async (email: string, password: string): Promise<
   try {
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     return userCredential.user;
-  } catch (error) {
+  } catch (error: any) {
     throw error;
   }
 };
@@ -73,7 +73,7 @@ export const signUpWithEmail = async (email: string, password: string): Promise<
 export const sendVerificationEmail = async (user: User): Promise<void> => {
   try {
     await sendEmailVerification(user);
-  } catch (error) {
+  } catch (error: any) {
     throw error;
   }
 };
@@ -84,7 +84,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
     console.log(userCredential.user.uid);
     return userCredential.user;
-  } catch (error) {
+  } catch (error: any) {
     throw error;
   }
 };
@@ -94,7 +94,7 @@ export const signInWithGoogle = async (): Promise<User> => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
     throw error;
   }
 };
@@ -104,7 +104,7 @@ export const signInWithFacebook = async (): Promise<User> => {
   try {
     const result = await signInWithPopup(auth, facebookProvider);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
     throw error;
   }
 };
@@ -114,7 +114,7 @@ export const signInWithTwitter = async (): Promise<User> => {
   try {
     const result = await signInWithPopup(auth, twitterProvider);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
     throw error;
   }
 };
@@ -123,7 +123,7 @@ export const signInWithTwitter = async (): Promise<User> => {
 export const signOutUser = async (): Promise<void> => {
   try {
     await signOut(auth);
-  } catch (error) {
+  } catch (error: any) {
     throw error;
   }
 };
