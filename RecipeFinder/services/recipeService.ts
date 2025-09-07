@@ -1,302 +1,284 @@
-// Recipe service that supports both MealDB API and Firebase
-import * as MealAPI from './mealAPI';
-import * as FirebaseRecipeService from './firebaseRecipeService';
+// Unified Recipe service that handles all recipe operations with admin approval workflow
+// This service now uses Firebase Firestore instead of AsyncStorage for pending recipes
+
+import { PendingRecipeService, PendingRecipe, Ingredient } from './pendingRecipeService';
+import { PublishedRecipeService, PublishedRecipe, Recipe, Category } from './publishedRecipeService';
+import { AdminService, AdminAction } from './adminService';
 import { auth } from './firebase';
 
-// Types
-export interface Ingredient {
-  name: string;
-  measure: string;
-}
+// Re-export types for backward compatibility
+export type { Ingredient, Recipe, PendingRecipe, PublishedRecipe, Category, AdminAction };
 
-export interface Recipe {
+// Legacy interface for backward compatibility
+export interface UserRecipe {
   id: string;
   title: string;
-  image: string;
   description: string;
+  image: string;
   cookTime: string;
   servings: string;
+  category: string;
   area?: string;
-  category?: string;
   ingredients: Ingredient[];
   instructions: string[];
-  videoUrl?: string; // YouTube video URL
-  userId?: string; // Owner of the recipe
-  createdAt?: Date; // Timestamp
-  updatedAt?: Date; // Timestamp
-  source?: 'firebase' | 'mealdb'; // Source of the recipe data
-  status?: 'pending' | 'approved' | 'rejected'; // Recipe approval status
+  videoUrl?: string;
+  ownerId: string;
+  createdAt: Date;
+  updatedAt: Date;
+  recipeType: 'pending' | 'published';
+  status: 'pending' | 'pending_edit' | 'published' | 'declined';
+  originalRecipeId?: string;
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  image: string;
-  description: string;
-}
-
-// Recipe Service functions
+// Main RecipeService that combines all services
 export const RecipeService = {
-  // Get all recipes (combines demo recipes from MealDB and user recipes from Firebase)
-  getRecipes: async (): Promise<Recipe[]> => {
-    try {
-      const [mealDbRecipes, firebaseRecipes] = await Promise.all([
-        MealAPI.getRandomMeals(5),
-        auth.currentUser ? FirebaseRecipeService.getAllRecipes() : Promise.resolve([])
-      ]);
-
-      // Mark the source of each recipe
-      mealDbRecipes.forEach((recipe: Recipe) => {
-        recipe.source = 'mealdb';
-      });
-      firebaseRecipes.forEach((recipe: Recipe) => {
-        recipe.source = 'firebase';
-      });
-
-      return [...mealDbRecipes, ...firebaseRecipes];
-    } catch (error) {
-      console.error('Error getting recipes:', error);
-      return [];
-    }
-  },
-
-  // Get recipe by ID (checks both MealDB and Firebase)
+  // Published Recipe Operations
+  getRecipes: PublishedRecipeService.getRecipes,
+  getAllPublishedRecipes: PublishedRecipeService.getAllPublishedRecipes,
+  getUserPublishedRecipes: PublishedRecipeService.getUserPublishedRecipes,
   getRecipeById: async (id: string): Promise<Recipe | undefined> => {
     try {
-      // Try Firebase first if user is logged in
-      if (auth.currentUser) {
-        const firebaseRecipe = await FirebaseRecipeService.getRecipeById(id);
-        if (firebaseRecipe) {
-          return { ...firebaseRecipe, source: 'firebase' };
-        }
+      // First try to get from pending recipes
+      const pendingRecipe = await PendingRecipeService.getPendingRecipeById(id);
+      if (pendingRecipe) {
+        // Convert PendingRecipe to Recipe format
+        return {
+          id: pendingRecipe.id || '',
+          title: pendingRecipe.title,
+          image: pendingRecipe.image,
+          description: pendingRecipe.description,
+          cookTime: pendingRecipe.cookTime,
+          servings: pendingRecipe.servings,
+          area: pendingRecipe.area,
+          category: pendingRecipe.category,
+          ingredients: pendingRecipe.ingredients,
+          instructions: pendingRecipe.instructions,
+          videoUrl: pendingRecipe.videoUrl,
+          youtubeUrl: pendingRecipe.videoUrl,
+          userId: pendingRecipe.ownerId,
+          createdAt: pendingRecipe.createdAt.toISOString(),
+          updatedAt: pendingRecipe.updatedAt.toISOString(),
+          source: 'firebase',
+          status: pendingRecipe.status as any
+        };
       }
-
-      // Try MealDB if not found in Firebase
-      const mealDbRecipe = await MealAPI.getMealById(id);
-      return mealDbRecipe ? { ...mealDbRecipe, source: 'mealdb' } : undefined;
-    } catch (error) {
+      
+      // If not found in pending, try published recipes and MealDB
+      return await PublishedRecipeService.getRecipeById(id);
+    } catch (error: any) {
       console.error('Error getting recipe by ID:', error);
       return undefined;
     }
   },
+  getRecipesByCategory: PublishedRecipeService.getRecipesByCategory,
+  getRandomRecipes: PublishedRecipeService.getRandomRecipes,
+  getRandomRecipe: PublishedRecipeService.getRandomRecipe,
+  getCategories: PublishedRecipeService.getCategories,
+  searchRecipes: PublishedRecipeService.searchRecipes,
+  updateRecipe: PublishedRecipeService.updatePublishedRecipe,
+  deleteRecipe: PublishedRecipeService.deletePublishedRecipe,
+  listenToUserPublishedRecipes: PublishedRecipeService.listenToUserPublishedRecipes,
 
-  // Get recipes by category (combines MealDB and Firebase results)
-  getRecipesByCategory: async (category: string): Promise<Recipe[]> => {
-    try {
-      const [mealDbRecipes, firebaseRecipes] = await Promise.all([
-        MealAPI.getMealsByCategory(category),
-        auth.currentUser ? FirebaseRecipeService.getRecipesByCategory(category) : Promise.resolve([])
-      ]);
+  // Pending Recipe Operations
+  addPendingRecipe: PendingRecipeService.addPendingRecipe,
+  getUserPendingRecipes: PendingRecipeService.getUserPendingRecipes,
+  updatePendingRecipe: PendingRecipeService.updatePendingRecipe,
+  deletePendingRecipe: PendingRecipeService.deletePendingRecipe,
+  getPendingRecipeById: PendingRecipeService.getPendingRecipeById,
+  createPendingEdit: PendingRecipeService.createPendingEdit,
+  listenToUserPendingRecipes: PendingRecipeService.listenToUserPendingRecipes,
 
-      // Mark the source of each recipe
-      mealDbRecipes.forEach((recipe: Recipe) => {
-        recipe.source = 'mealdb';
-      });
-      firebaseRecipes.forEach((recipe: Recipe) => {
-        recipe.source = 'firebase';
-      });
+  // Admin Operations
+  getAllPendingRecipes: AdminService.getAllPendingRecipes,
+  approveRecipe: AdminService.approveRecipe,
+  declineRecipe: AdminService.declineRecipe,
+  deletePublishedRecipe: AdminService.deletePublishedRecipe,
+  listenToAllPendingRecipes: AdminService.listenToAllPendingRecipes,
+  getAdminActions: AdminService.getAdminActions,
+  getAdminStats: AdminService.getAdminStats,
+  isCurrentUserAdmin: AdminService.isCurrentUserAdmin,
 
-      return [...mealDbRecipes, ...firebaseRecipes];
-    } catch (error) {
-      console.error('Error getting recipes by category:', error);
-      return [];
-    }
-  },
-
-  // ===== FIREBASE CATEGORY MANAGEMENT =====
-  
-  // Create a new category in Firebase
-  createCategory: async (category: Omit<Category, 'id'>): Promise<Category> => {
-    try {
-      return await FirebaseRecipeService.createCategory(category);
-    } catch (error) {
-      console.error('Error creating category:', error);
-      throw error;
-    }
-  },
-
-  // Get category by ID from Firebase
-  getCategoryById: async (id: string): Promise<Category | null> => {
-    try {
-      return await FirebaseRecipeService.getCategoryById(id);
-    } catch (error) {
-      console.error('Error getting category by ID:', error);
-      throw error;
-    }
-  },
-
-  // Update a category in Firebase
-  updateCategory: async (id: string, categoryData: Partial<Category>): Promise<void> => {
-    try {
-      await FirebaseRecipeService.updateCategory(id, categoryData);
-    } catch (error) {
-      console.error('Error updating category:', error);
-      throw error;
-    }
-  },
-
-  // Delete a category from Firebase
-  deleteCategory: async (id: string): Promise<void> => {
-    try {
-      await FirebaseRecipeService.deleteCategory(id);
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      throw error;
-    }
-  },
-
-  // Get random recipes (primarily from MealDB for demo content)
-  getRandomRecipes: async (count: number = 5): Promise<Recipe[]> => {
-    try {
-      const recipes = await MealAPI.getRandomMeals(count);
-      recipes.forEach((recipe: Recipe) => {
-        recipe.source = 'mealdb';
-      });
-      return recipes;
-    } catch (error) {
-      console.error('Error getting random recipes:', error);
-      return [];
-    }
-  },
-
-  // Get a random recipe for featured section (from MealDB)
-  getRandomRecipe: async (): Promise<Recipe | undefined> => {
-    try {
-      const recipes = await MealAPI.getRandomMeals(1);
-      if (recipes.length > 0) {
-        const recipe: Recipe = recipes[0];
-        recipe.source = 'mealdb';
-        return recipe;
-      }
-      return undefined;
-    } catch (error) {
-      console.error('Error getting random recipe:', error);
-      return undefined;
-    }
-  },
-
-  // Get all categories (combines MealDB and Firebase categories)
-  getCategories: async (): Promise<Category[]> => {
-    try {
-      const [mealDbCategories, firebaseCategories] = await Promise.all([
-        MealAPI.getMealCategories(),
-        FirebaseRecipeService.getAllCategories()
-      ]);
-
-      return [...mealDbCategories, ...firebaseCategories];
-    } catch (error) {
-      console.error('Error getting categories:', error);
-      return [];
-    }
-  },
-
-  // Search recipes (combines results from both sources)
-  searchRecipes: async (query: string): Promise<Recipe[]> => {
-    try {
-      const [mealDbRecipes, firebaseRecipes] = await Promise.all([
-        MealAPI.searchMealsByName(query),
-        auth.currentUser ? FirebaseRecipeService.searchRecipes(query) : Promise.resolve([])
-      ]);
-
-      // Mark the source of each recipe
-      mealDbRecipes.forEach((recipe: Recipe) => {
-        recipe.source = 'mealdb';
-      });
-      firebaseRecipes.forEach((recipe: Recipe) => {
-        recipe.source = 'firebase';
-      });
-
-      return [...mealDbRecipes, ...firebaseRecipes];
-    } catch (error) {
-      console.error('Error searching recipes:', error);
-      return [];
-    }
-  },
-
-  // CRUD operations (Firebase only)
+  // Legacy methods for backward compatibility
   addRecipe: async (recipe: Omit<Recipe, 'id'>): Promise<Recipe | undefined> => {
     try {
-      if (!auth.currentUser) throw new Error('User must be logged in to add recipes');
-      return await FirebaseRecipeService.createRecipe(recipe);
-    } catch (error) {
+      if (!auth.currentUser) {
+        throw new Error('User must be authenticated to add recipes');
+      }
+
+      // Convert Recipe to PendingRecipe format
+      const pendingRecipeData = {
+        title: recipe.title,
+        description: recipe.description || '',
+        image: recipe.image,
+        cookTime: recipe.cookTime,
+        servings: recipe.servings,
+        category: recipe.category || 'Other',
+        area: recipe.area,
+        ingredients: recipe.ingredients,
+        instructions: recipe.instructions,
+        videoUrl: recipe.videoUrl
+      };
+
+      const pendingRecipe = await PendingRecipeService.addPendingRecipe(
+        auth.currentUser.uid,
+        pendingRecipeData
+      );
+
+      // Convert back to Recipe format for return
+      return {
+        id: pendingRecipe.id || '',
+        title: pendingRecipe.title,
+        image: pendingRecipe.image,
+        description: pendingRecipe.description,
+        cookTime: pendingRecipe.cookTime,
+        servings: pendingRecipe.servings,
+        area: pendingRecipe.area,
+        category: pendingRecipe.category,
+        ingredients: pendingRecipe.ingredients,
+        instructions: pendingRecipe.instructions,
+        videoUrl: pendingRecipe.videoUrl,
+        userId: pendingRecipe.ownerId,
+        createdAt: pendingRecipe.createdAt,
+        updatedAt: pendingRecipe.updatedAt,
+        source: 'firebase',
+        status: 'pending'
+      };
+    } catch (error: any) {
       console.error('Error adding recipe:', error);
       return undefined;
     }
   },
 
-  updateRecipe: async (id: string, recipeData: Partial<Recipe>): Promise<boolean> => {
-    try {
-      if (!auth.currentUser) throw new Error('User must be logged in to update recipes');
-      await FirebaseRecipeService.updateRecipe(id, recipeData);
-      return true;
-    } catch (error) {
-      console.error('Error updating recipe:', error);
-      return false;
-    }
-  },
-
-  deleteRecipe: async (id: string): Promise<boolean> => {
-    try {
-      if (!auth.currentUser) throw new Error('User must be logged in to delete recipes');
-      await FirebaseRecipeService.deleteRecipe(id);
-      return true;
-    } catch (error) {
-      console.error('Error deleting recipe:', error);
-      return false;
-    }
-  },
-
-  // === ADMIN FUNCTIONS FOR PENDING RECIPE MANAGEMENT ===
-  
-  // Get all pending recipes (admin only)
+  // Legacy method - now returns pending recipes as Recipe format
   getPendingRecipes: async (): Promise<Recipe[]> => {
     try {
-      return await FirebaseRecipeService.getPendingRecipes();
-    } catch (error) {
+      const pendingRecipes = await AdminService.getAllPendingRecipes();
+      return pendingRecipes.map(pending => ({
+        id: pending.id || '',
+        title: pending.title,
+        image: pending.image,
+        description: pending.description,
+        cookTime: pending.cookTime,
+        servings: pending.servings,
+        area: pending.area,
+        category: pending.category,
+        ingredients: pending.ingredients,
+        instructions: pending.instructions,
+        videoUrl: pending.videoUrl,
+        userId: pending.ownerId,
+        createdAt: pending.createdAt,
+        updatedAt: pending.updatedAt,
+        source: 'firebase',
+        status: 'pending'
+      }));
+    } catch (error: any) {
       console.error('Error getting pending recipes:', error);
       return [];
     }
   },
 
-  // Approve a pending recipe (admin only)
-  approveRecipe: async (id: string): Promise<boolean> => {
+  // Legacy admin methods with simplified signatures
+  publishPending: async (pendingId: string, adminId: string): Promise<void> => {
+    return AdminService.approveRecipe(pendingId, adminId);
+  },
+
+  declinePending: async (pendingId: string, adminId: string, reason?: string): Promise<void> => {
+    return AdminService.declineRecipe(pendingId, adminId, reason);
+  },
+
+  // Legacy method for getting all recipes (admin view)
+  getAllRecipesAdmin: async (): Promise<Recipe[]> => {
     try {
-      await FirebaseRecipeService.approveRecipe(id);
-      return true;
-    } catch (error) {
-      console.error('Error approving recipe:', error);
-      return false;
+      const publishedRecipes = await AdminService.getAllPublishedRecipes();
+      return publishedRecipes.map(published => ({
+        id: published.id || '',
+        title: published.title,
+        image: published.image,
+        description: published.description,
+        cookTime: published.cookTime,
+        servings: published.servings,
+        area: published.area,
+        category: published.category,
+        ingredients: published.ingredients,
+        instructions: published.instructions,
+        videoUrl: published.videoUrl,
+        userId: published.ownerId,
+        createdAt: published.createdAt,
+        updatedAt: published.updatedAt,
+        source: 'firebase',
+        status: 'approved'
+      }));
+    } catch (error: any) {
+      console.error('Error getting all recipes for admin:', error);
+      return [];
     }
   },
 
-  // Reject a pending recipe (admin only)
+  // Legacy method for getting user's all recipes (both pending and published)
+  getUserRecipesAll: async (userId: string): Promise<Recipe[]> => {
+    try {
+      const [pendingRecipes, publishedRecipes] = await Promise.all([
+        PendingRecipeService.getUserPendingRecipes(userId),
+        PublishedRecipeService.getUserPublishedRecipes(userId)
+      ]);
+
+      const pendingAsRecipes: Recipe[] = pendingRecipes.map(pending => ({
+        id: pending.id || '',
+        title: pending.title,
+        image: pending.image,
+        description: pending.description,
+        cookTime: pending.cookTime,
+        servings: pending.servings,
+        area: pending.area,
+        category: pending.category,
+        ingredients: pending.ingredients,
+        instructions: pending.instructions,
+        videoUrl: pending.videoUrl,
+        userId: pending.ownerId,
+        createdAt: pending.createdAt,
+        updatedAt: pending.updatedAt,
+        source: 'firebase',
+        status: pending.status === 'declined' ? 'rejected' : 'pending'
+      }));
+
+      const publishedAsRecipes: Recipe[] = publishedRecipes.map(published => ({
+        id: published.id || '',
+        title: published.title,
+        image: published.image,
+        description: published.description,
+        cookTime: published.cookTime,
+        servings: published.servings,
+        area: published.area,
+        category: published.category,
+        ingredients: published.ingredients,
+        instructions: published.instructions,
+        videoUrl: published.videoUrl,
+        userId: published.ownerId,
+        createdAt: published.createdAt,
+        updatedAt: published.updatedAt,
+        source: 'firebase',
+        status: 'approved'
+      }));
+
+      return [...pendingAsRecipes, ...publishedAsRecipes];
+    } catch (error: any) {
+      console.error('Error getting user recipes:', error);
+      return [];
+    }
+  },
+
+  // Legacy methods with simplified implementations
   rejectRecipe: async (id: string): Promise<boolean> => {
     try {
-      await FirebaseRecipeService.rejectRecipe(id);
+      if (!auth.currentUser) return false;
+      await AdminService.declineRecipe(id, auth.currentUser.uid, 'Rejected by admin');
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error rejecting recipe:', error);
       return false;
     }
-  },
-
-  // Get all recipes with any status (admin only)
-  getAllRecipesAdmin: async (): Promise<Recipe[]> => {
-    try {
-      return await FirebaseRecipeService.getAllRecipesAdmin();
-    } catch (error) {
-      console.error('Error getting all recipes (admin):', error);
-      return [];
-    }
-  },
-
-  // Get all user's recipes regardless of status (for user's own view)
-  getUserRecipesAll: async (userId: string): Promise<Recipe[]> => {
-    try {
-      return await FirebaseRecipeService.getUserRecipesAll(userId);
-    } catch (error) {
-      console.error('Error getting all user recipes:', error);
-      return [];
-    }
   }
 };
+
+// Export individual services for direct access if needed
+export { PendingRecipeService, PublishedRecipeService, AdminService };
