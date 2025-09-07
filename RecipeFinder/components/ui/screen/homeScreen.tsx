@@ -175,7 +175,7 @@ const HomeScreen: React.FC = () => {
 
         {/* TITLE SECTION */}
         <View style={homeStyles.titleSection}>
-          <Text style={homeStyles.welcomeText}>Recipe Finder</Text>
+          <Text style={homeStyles.welcomeText}>Food Coast</Text>
         </View>
 
         {/* FEATURED SECTION */}

@@ -7,7 +7,6 @@ import { favoritesStyles } from '@/assets/styles/favorites.styles';
 import RecipeCard from '@/components/RecipeCard';
 import NoFavoritesFound from '@/components/NoFavoritesFound';
 
-// Mock favorite recipes data (in a real app, this would come from a state or context)
 const favoriteRecipes = [
   {
     id: '101',

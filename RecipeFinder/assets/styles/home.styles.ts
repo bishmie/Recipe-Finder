@@ -20,6 +20,7 @@ export const homeStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
+<<<<<<< HEAD
   iconButton: {
     width: 40,
     height: 40,
@@ -41,6 +42,8 @@ export const homeStyles = StyleSheet.create({
     paddingBottom: 16,
     alignItems: "center",
   },
+=======
+>>>>>>> 3fa1aac7fb24ab97d1b89fb959709588ba045312
   welcomeText: {
     fontSize: 32,
     fontWeight: "800",
@@ -137,6 +140,7 @@ export const homeStyles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 16,
   },
+<<<<<<< HEAD
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -232,6 +236,8 @@ export const homeStyles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.white,
   },
+=======
+>>>>>>> 3fa1aac7fb24ab97d1b89fb959709588ba045312
   emptyState: {
     alignItems: "center",
     paddingVertical: 64,
