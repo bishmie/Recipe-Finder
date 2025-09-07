@@ -34,7 +34,7 @@ export default function SearchScreen() {
       setLoading(true);
       const results = await RecipeService.searchRecipes(query);
       setRecipes(results);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error searching recipes:', error);
       setRecipes([]);
     } finally {
@@ -48,7 +48,7 @@ export default function SearchScreen() {
       setLoading(true);
       const recipes = await RecipeService.getRandomRecipes(12);
       setRecipes(recipes);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading initial recipes:', error);
       setRecipes([]);
     } finally {
@@ -85,7 +85,7 @@ export default function SearchScreen() {
         const filteredRecipes = await RecipeService.getRecipesByCategory(filter);
         setRecipes(filteredRecipes);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error filtering recipes:', error);
       setRecipes([]);
     } finally {
