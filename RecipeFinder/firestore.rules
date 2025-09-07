@@ -1,0 +1,168 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+    
+    // Helper function to check if user owns the document
+    function isOwner(ownerId) {
+      return isAuthenticated() && request.auth.uid == ownerId;
+    }
+    
+    // Helper function to validate pending recipe data
+    function isValidPendingRecipe() {
+      return request.resource.data.keys().hasAll(['title', 'description', 'image', 'cookTime', 'servings', 'category', 'ingredients', 'instructions', 'ownerId', 'status', 'createdAt', 'updatedAt']) &&
+             request.resource.data.title is string &&
+             request.resource.data.title.size() > 0 &&
+             request.resource.data.description is string &&
+             request.resource.data.image is string &&
+             request.resource.data.cookTime is string &&
+             request.resource.data.servings is string &&
+             request.resource.data.category is string &&
+             request.resource.data.ingredients is list &&
+             request.resource.data.instructions is list &&
+             request.resource.data.ownerId == request.auth.uid &&
+             request.resource.data.status in ['pending', 'pending_edit', 'declined'] &&
+             request.resource.data.createdAt is timestamp &&
+             request.resource.data.updatedAt is timestamp;
+    }
+    
+    // Helper function to validate published recipe data
+    function isValidPublishedRecipe() {
+      return request.resource.data.keys().hasAll(['title', 'description', 'image', 'cookTime', 'servings', 'category', 'ingredients', 'instructions', 'ownerId', 'createdAt', 'updatedAt', 'publishedAt']) &&
+             request.resource.data.title is string &&
+             request.resource.data.title.size() > 0 &&
+             request.resource.data.description is string &&
+             request.resource.data.image is string &&
+             request.resource.data.cookTime is string &&
+             request.resource.data.servings is string &&
+             request.resource.data.category is string &&
+             request.resource.data.ingredients is list &&
+             request.resource.data.instructions is list &&
+             request.resource.data.ownerId is string &&
+             request.resource.data.createdAt is timestamp &&
+             request.resource.data.updatedAt is timestamp &&
+             request.resource.data.publishedAt is timestamp;
+    }
+    
+    // Rules for pending recipes collection
+    match /pending_recipes/{recipeId} {
+      // Allow read access:
+      // - Admins can read all pending recipes
+      // - Users can read their own pending recipes
+      allow read: if isAdmin() || isOwner(resource.data.ownerId);
+      
+      // Allow create access:
+      // - Authenticated users can create pending recipes with valid data
+      // - Must set ownerId to current user
+      allow create: if isAuthenticated() && 
+                       isValidPendingRecipe() &&
+                       request.resource.data.ownerId == request.auth.uid;
+      
+      // Allow update access:
+      // - Users can update their own pending recipes
+      // - Admins can update any pending recipe (for status changes)
+      allow update: if (isOwner(resource.data.ownerId) && 
+                       isValidPendingRecipe() &&
+                       request.resource.data.ownerId == resource.data.ownerId) ||
+                      isAdmin();
+      
+      // Allow delete access:
+      // - Users can delete their own pending recipes
+      // - Admins can delete any pending recipe
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+    
+    // Rules for published recipes collection
+    match /recipes/{recipeId} {
+      // Allow read access:
+      // - Everyone can read published recipes (public)
+      allow read: if true;
+      
+      // Allow create access:
+      // - Only admins can create published recipes (through approval process)
+      allow create: if isAdmin() && isValidPublishedRecipe();
+      
+      // Allow update access:
+      // - Recipe owners can update their own published recipes
+      // - Admins can update any published recipe
+      allow update: if (isOwner(resource.data.ownerId) && 
+                       isValidPublishedRecipe() &&
+                       request.resource.data.ownerId == resource.data.ownerId) ||
+                      isAdmin();
+      
+      // Allow delete access:
+      // - Recipe owners can delete their own published recipes
+      // - Admins can delete any published recipe
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+    
+    // Rules for admin collection (to track admin users)
+    match /admins/{userId} {
+      // Allow read access:
+      // - Users can check if they are admin
+      // - Admins can read admin list
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid == userId || isAdmin());
+      
+      // Allow create/update/delete access:
+      // - Only existing admins can manage admin list
+      allow write: if isAdmin();
+    }
+    
+    // Rules for admin actions collection (audit log)
+    match /admin_actions/{actionId} {
+      // Allow read access:
+      // - Only admins can read admin actions
+      allow read: if isAdmin();
+      
+      // Allow create access:
+      // - Only admins can create admin action logs
+      allow create: if isAdmin() &&
+                       request.resource.data.keys().hasAll(['adminId', 'action', 'targetId', 'timestamp']) &&
+                       request.resource.data.adminId == request.auth.uid &&
+                       request.resource.data.action in ['approve', 'decline', 'delete'] &&
+                       request.resource.data.targetId is string &&
+                       request.resource.data.timestamp is timestamp;
+      
+      // Prevent update/delete of admin actions (audit trail integrity)
+      allow update, delete: if false;
+    }
+    
+    // Rules for categories collection (if needed)
+    match /categories/{categoryId} {
+      // Allow read access:
+      // - Everyone can read categories
+      allow read: if true;
+      
+      // Allow write access:
+      // - Only admins can manage categories
+      allow write: if isAdmin();
+    }
+    
+    // Default deny rule for any other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+
+// Additional notes:
+// 1. To set up admin users, you'll need to manually add documents to the 'admins' collection
+//    with the user's UID as the document ID and any admin metadata as fields.
+//    Example: /admins/user123 { isAdmin: true, role: 'admin', createdAt: timestamp }
+//
+// 2. Deploy these rules using Firebase CLI:
+//    firebase deploy --only firestore:rules
+//
+// 3. Test the rules in Firebase Console > Firestore > Rules playground
+//
+// 4. Monitor rule usage in Firebase Console > Firestore > Usage tab
