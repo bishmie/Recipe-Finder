@@ -2,6 +2,7 @@ import { View, Text, ScrollView, TouchableOpacity, FlatList, RefreshControl, Mod
 import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { homeStyles } from "../../../assets/styles/home.styles";
+import LogoutModal from '../LogoutModal';
 import { Image } from "expo-image";
 import { COLORS } from "../../../constants/colors";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,6 +43,7 @@ const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [profileMenuVisible, setProfileMenuVisible] = useState<boolean>(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState<boolean>(false);
 
   const loadData = async () => {
     try {
@@ -96,30 +98,12 @@ const HomeScreen: React.FC = () => {
   };
 
   const handleLogout = () => {
-    console.log('Logout button pressed');
-    console.log('signOut function:', typeof signOut);
     setProfileMenuVisible(false);
-    
-    // Direct signOut call without Alert to test if Alert is the issue
-    const performLogout = async () => {
-      try {
-        console.log('Starting logout process...');
-        console.log('signOut function type:', typeof signOut);
-        if (typeof signOut === 'function') {
-          await signOut();
-          console.log('SignOut completed, navigating to sign-in...');
-          router.replace('/(auth)/sign-in');
-        } else {
-          console.error('signOut is not a function:', signOut);
-        }
-      } catch (error: any) {
-        console.error('Logout error:', error);
-        Alert.alert('Error', 'Failed to logout. Please try again.');
-      }
-    };
-    
-    // Skip Alert for testing
-    performLogout();
+    setLogoutModalVisible(true);
+  };
+
+  const handleCancelLogout = () => {
+    setLogoutModalVisible(false);
   };
 
   useEffect(() => {
@@ -182,6 +166,12 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </Modal>
         
+        {/* Logout Confirmation Modal */}
+      <LogoutModal
+        visible={logoutModalVisible}
+        onCancel={handleCancelLogout}
+        message="Are you sure you want to logout?"
+      />
 
         {/* TITLE SECTION */}
         <View style={homeStyles.titleSection}>
