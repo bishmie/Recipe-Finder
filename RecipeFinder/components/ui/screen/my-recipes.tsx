@@ -7,6 +7,7 @@ import {
   Alert,
   RefreshControl,
   Modal,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -38,6 +39,8 @@ const MyRecipesScreen = () => {
   const [editingRecipe, setEditingRecipe] = useState<UserRecipe | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [recipeToDelete, setRecipeToDelete] = useState<UserRecipe | null>(null);
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [recipeToEdit, setRecipeToEdit] = useState<UserRecipe | null>(null);
 
   const loadUserRecipes = async () => {
     if (!user?.uid) return;
@@ -106,9 +109,9 @@ const MyRecipesScreen = () => {
         success = true;
         console.log('deletePendingRecipe completed successfully');
       } else {
-        console.log('Calling RecipeService.deletePublishedRecipe...');
-        success = await RecipeService.deletePublishedRecipe(recipeToDelete.id);
-        console.log('deletePublishedRecipe result:', success);
+        console.log('Calling RecipeService.deleteRecipe...');
+        success = await RecipeService.deleteRecipe(recipeToDelete.id);
+        console.log('deleteRecipe result:', success);
       }
       
       if (success) {
@@ -151,36 +154,71 @@ const MyRecipesScreen = () => {
         'You are now editing a pending recipe. Changes will be saved for admin review.'
       );
     } else {
-      // For published recipes, create a pending edit
-      try {
-        await RecipeService.createPendingEdit(recipe.id, {
-          title: recipe.title,
-          description: recipe.description,
-          image: recipe.image,
-          cookTime: recipe.cookTime,
-          servings: recipe.servings,
-          category: recipe.category,
-          area: recipe.area,
-          ingredients: recipe.ingredients,
-          instructions: recipe.instructions,
-          videoUrl: recipe.videoUrl
-        });
+      // For published recipes, show confirmation modal
+      setRecipeToEdit(recipe);
+      setShowEditConfirm(true);
+    }
+  };
+
+  const confirmEditRecipe = async () => {
+    if (!recipeToEdit || !user?.uid) return;
+    
+    setShowEditConfirm(false);
+    
+    try {
+      // check if a pending edit already exists
+      const existingEdit = await RecipeService.getExistingPendingEdit(recipeToEdit.id, user.uid);
+      
+      if (existingEdit) {
+        // if pending edit exists, open it for editing
+        const existingEditAsUserRecipe: UserRecipe = {
+          ...existingEdit,
+          recipeType: 'pending' as const
+        };
+        setEditingRecipe(existingEditAsUserRecipe);
+        setShowAddModal(true);
         Alert.alert(
-          'Edit Submitted',
-          'Your recipe edit has been submitted for admin approval. You can continue editing it in your pending recipes.',
+          'Editing Existing Draft',
+          'You already have a pending edit for this recipe. Opening your existing draft for editing.'
+        );
+      } else {
+        // Create new pending edit
+        await RecipeService.createPendingEdit(recipeToEdit.id, {
+          title: recipeToEdit.title,
+          description: recipeToEdit.description,
+          image: recipeToEdit.image,
+          cookTime: recipeToEdit.cookTime,
+          servings: recipeToEdit.servings,
+          category: recipeToEdit.category,
+          area: recipeToEdit.area,
+          ingredients: recipeToEdit.ingredients,
+          instructions: recipeToEdit.instructions,
+          videoUrl: recipeToEdit.videoUrl
+        });
+        
+        Alert.alert(
+          'Edit Draft Created',
+          'Your recipe edit draft has been created. You can now edit it and submit for admin approval.',
           [
             { text: 'OK', onPress: () => loadUserRecipes() }
           ]
         );
-      } catch (error: any) {
-        console.error('Error creating pending edit:', error);
-        Alert.alert('Error', `Failed to submit recipe edit: ${error?.message || 'Unknown error'}`);
       }
+    } catch (error: any) {
+      console.error('Error handling recipe edit:', error);
+      Alert.alert('Error', `Failed to edit recipe: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setRecipeToEdit(null);
     }
   };
 
+  const cancelEditRecipe = () => {
+    setShowEditConfirm(false);
+    setRecipeToEdit(null);
+  };
+
   const handleRecipeAdded = async (recipeData: any) => {
-    // The AddRecipeModal already handles saving the recipe to the database
+    // AddRecipeModal already handles saving the recipe to the database
     // This function just needs to update the UI state and refresh the list
     console.log('Recipe added/updated:', recipeData.title);
     
@@ -264,6 +302,7 @@ const MyRecipesScreen = () => {
         case 'pending_edit':
           return '#007AFF';
         case 'rejected':
+        case 'declined':
           return '#FF3B30';
         default:
           return '#8E8E93';
@@ -281,7 +320,8 @@ const MyRecipesScreen = () => {
         case 'pending_edit':
           return 'Edit Pending';
         case 'rejected':
-          return 'Rejected';
+        case 'declined':
+          return 'Declined';
         default:
           return 'Draft';
       }
@@ -298,6 +338,7 @@ const MyRecipesScreen = () => {
         case 'pending_edit':
           return 'create-outline';
         case 'rejected':
+        case 'declined':
           return 'close-circle-outline';
         default:
           return 'document-outline';
@@ -477,6 +518,85 @@ const MyRecipesScreen = () => {
                   fontWeight: '600'
                 }}>
                   Delete
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Confirmation Modal */}
+      <Modal
+        visible={showEditConfirm}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelEditRecipe}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20
+        }}>
+          <View style={{
+            backgroundColor: COLORS.white,
+            borderRadius: 12,
+            padding: 24,
+            width: '100%',
+            maxWidth: 400
+          }}>
+            <Text style={{
+              fontSize: 18,
+              fontWeight: 'bold',
+              color: COLORS.text,
+              marginBottom: 12
+            }}>
+              Edit Published Recipe
+            </Text>
+            <Text style={{
+              fontSize: 16,
+              color: COLORS.textLight,
+              marginBottom: 24,
+              lineHeight: 22
+            }}>
+              Editing "{recipeToEdit?.title}" will create a draft that needs admin approval. You can continue editing the draft until you're ready to submit it for review.
+            </Text>
+            <View style={{
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              gap: 12
+            }}>
+              <TouchableOpacity
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  backgroundColor: COLORS.border
+                }}
+                onPress={cancelEditRecipe}
+              >
+                <Text style={{
+                  color: COLORS.text,
+                  fontWeight: '600'
+                }}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  backgroundColor: COLORS.primary
+                }}
+                onPress={confirmEditRecipe}
+              >
+                <Text style={{
+                  color: COLORS.white,
+                  fontWeight: '600'
+                }}>
+                  Create Draft
                 </Text>
               </TouchableOpacity>
             </View>
