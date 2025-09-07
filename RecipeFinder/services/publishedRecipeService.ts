@@ -277,7 +277,7 @@ export const PublishedRecipeService = {
   searchRecipes: async (query: string): Promise<Recipe[]> => {
     try {
       // For now, use MealDB search
-      // In the future, you could implement Firestore text search
+      // need to implement firestore search
       return await MealAPI.searchRecipes(query);
     } catch (error: any) {
       console.error('Error searching recipes:', error);
