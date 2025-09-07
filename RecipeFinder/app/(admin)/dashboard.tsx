@@ -7,15 +7,16 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../constants/colors';
 import { useAuth } from '../../context/AuthContext';
-import { RecipeService } from '../../services/recipeService';
-import { LocalRecipeService } from '../../services/localRecipeService';
+import { AdminService } from '../../services/adminService';
 import LoadingSpinner from '../../components/LoadingSpinner';
+import LogoutModal from '../../components/ui/LogoutModal';
 
 interface StatCard {
   title: string;
@@ -29,9 +30,10 @@ const AdminDashboard = () => {
   const router = useRouter();
   const { user, isAdmin, signOut } = useAuth();
   const [pendingRecipesCount, setPendingRecipesCount] = useState(0);
+  const [pendingEditsCount, setPendingEditsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [localPendingCount, setLocalPendingCount] = useState(0);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -43,15 +45,18 @@ const AdminDashboard = () => {
 
   const loadStats = async () => {
     try {
-      const [pendingRecipes, localRecipes] = await Promise.all([
-        RecipeService.getPendingRecipes(),
-        LocalRecipeService.getLocalRecipes()
-      ]);
-      setPendingRecipesCount(pendingRecipes.length);
-      setLocalPendingCount(localRecipes.length);
-    } catch (error) {
+      const stats = await AdminService.getAdminStats();
+      const allPendingRecipes = await AdminService.getAllPendingRecipes();
+      
+      // Separate new recipes from edits
+      const newRecipes = allPendingRecipes.filter(recipe => recipe.status === 'pending');
+      const pendingEdits = allPendingRecipes.filter(recipe => recipe.status === 'pending_edit');
+      
+      setPendingRecipesCount(newRecipes.length);
+      setPendingEditsCount(pendingEdits.length);
+    } catch (error: any) {
       console.error('Error loading dashboard data:', error);
-      Alert.alert('Error', 'Failed to load dashboard data');
+      Alert.alert('Error', `Failed to load dashboard data: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -65,18 +70,11 @@ const AdminDashboard = () => {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => signOut(),
-        },
-      ]
-    );
+    setLogoutModalVisible(true);
+  };
+
+  const handleCancelLogout = () => {
+    setLogoutModalVisible(false);
   };
 
 
@@ -84,11 +82,25 @@ const AdminDashboard = () => {
 
   const statCards: StatCard[] = [
     {
-      title: 'Pending Recipes',
-      value: pendingRecipesCount + localPendingCount,
-      icon: 'time-outline',
+      title: 'New Pending Recipes',
+      value: pendingRecipesCount,
+      icon: 'add-circle-outline',
       color: '#FF9500',
-      onPress: () => router.push('/(admin)/pending-recipes'),
+      onPress: () => router.push('/(admin)/pending-recipes?filter=new'),
+    },
+    {
+      title: 'Pending Recipe Edits',
+      value: pendingEditsCount,
+      icon: 'create-outline',
+      color: '#007AFF',
+      onPress: () => router.push('/(admin)/pending-recipes?filter=edits'),
+    },
+    {
+      title: 'Total Pending Items',
+      value: pendingRecipesCount + pendingEditsCount,
+      icon: 'time-outline',
+      color: '#34C759',
+      onPress: () => router.push('/(admin)/pending-recipes?filter=all'),
     },
   ];
 
@@ -108,8 +120,8 @@ const AdminDashboard = () => {
           <Text style={styles.headerSubtitle}>Welcome back, Admin!</Text>
         </View>
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Ionicons name="log-out-outline" size={24} color={COLORS.white} />
-        </TouchableOpacity>
+            <Ionicons name="log-out-outline" size={24} color={COLORS.white} />
+          </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -149,23 +161,9 @@ const AdminDashboard = () => {
           >
             <Ionicons name="time-outline" size={24} color={COLORS.primary} />
             <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Review Pending Recipes</Text>
+              <Text style={styles.actionTitle}>Review Pending Items</Text>
               <Text style={styles.actionSubtitle}>
-                {pendingRecipesCount + localPendingCount} recipes waiting for approval
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => router.push('/(admin)/all-recipes')}
-          >
-            <Ionicons name="restaurant-outline" size={24} color={COLORS.primary} />
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Manage All Recipes</Text>
-              <Text style={styles.actionSubtitle}>
-                View and manage all recipes in the system
+                {pendingRecipesCount + pendingEditsCount} items waiting for approval
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
@@ -173,6 +171,13 @@ const AdminDashboard = () => {
 
         </View>
       </ScrollView>
+      
+      {/* Logout Confirmation Modal */}
+       <LogoutModal
+         visible={logoutModalVisible}
+         onCancel={handleCancelLogout}
+         message="Are you sure you want to logout from admin dashboard?"
+       />
     </SafeAreaView>
   );
 };
