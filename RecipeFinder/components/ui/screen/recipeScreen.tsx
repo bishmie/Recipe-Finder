@@ -75,7 +75,6 @@ export default function RecipeScreen() {
   // Toggle favorite status
   const toggleFavorite = () => {
     setIsFavorite(!isFavorite);
-    // In a real app, you would update this in a database or context
   };
 
   // Handle back navigation
