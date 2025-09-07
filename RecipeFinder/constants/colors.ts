@@ -97,5 +97,19 @@ export const THEMES = {
   roseGold: roseGoldTheme,
 };
 
+// Status colors that work well with all themes
+export const STATUS_COLORS = {
+  success: "#4CAF50",
+  error: "#F44336",
+  warning: "#FF9800",
+  info: "#2196F3",
+  successLight: "#E8F5E9",
+  errorLight: "#FFEBEE",
+  warningLight: "#FFF3E0",
+  infoLight: "#E3F2FD",
+  danger: "#F44336",
+  lightGray: "#F5F5F5",
+};
+
 // 👇 change this to switch theme
-export const COLORS = THEMES.sunset;
+export const COLORS = THEMES.midnight;
