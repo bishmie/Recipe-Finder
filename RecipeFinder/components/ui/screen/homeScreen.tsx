@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, TouchableOpacity, FlatList, RefreshControl } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, FlatList, RefreshControl, Modal, Alert } from "react-native";
 import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
 import { homeStyles } from "../../../assets/styles/home.styles";
@@ -8,7 +8,10 @@ import { Ionicons } from "@expo/vector-icons";
 import CategoryFilter from "../../../components/CategoryFilter";
 import RecipeCard from "../../../components/RecipeCard";
 import LoadingSpinner from "../../../components/LoadingSpinner";
-import { RecipeService } from "../../../services/recipeService";
+
+import { RecipeService } from '../../../services/recipeService';
+import { getMealCategories } from '../../../services/mealAPI';
+import { useAuth } from "../../../hooks/useAuth";
 
 // Types
 interface Category {
@@ -30,6 +33,7 @@ interface Recipe {
 
 const HomeScreen: React.FC = () => {
   const router = useRouter();
+  const { signOut, user, loading: authLoading } = useAuth();
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -37,45 +41,50 @@ const HomeScreen: React.FC = () => {
   const [featuredRecipe, setFeaturedRecipe] = useState<Recipe | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [profileMenuVisible, setProfileMenuVisible] = useState<boolean>(false);
 
   const loadData = async () => {
     try {
       setLoading(true);
-
-      // Get data from RecipeService
-      const [categories, randomRecipes, featuredRecipe] = await Promise.all([
-        RecipeService.getCategories(),
-        RecipeService.getRandomRecipes(12),
-        RecipeService.getRandomRecipe()
-      ]);
-
-      setCategories(categories);
-      if (!selectedCategory && categories.length > 0) {
-        setSelectedCategory(categories[0].name);
+      
+      // Load categories
+      const fetchedCategories = await getMealCategories();
+      setCategories(fetchedCategories);
+      
+      // Set initial category and load its recipes
+      if (fetchedCategories.length > 0) {
+        const initialCategory = fetchedCategories[0].name;
+        setSelectedCategory(initialCategory);
+        await loadCategoryData(initialCategory);
       }
-
-      setRecipes(randomRecipes);
-      if (featuredRecipe) {
-        setFeaturedRecipe(featuredRecipe);
+      
+      // Load featured recipe
+      const randomRecipe = await RecipeService.getRandomRecipe();
+      if (randomRecipe) {
+        setFeaturedRecipe(randomRecipe);
       }
     } catch (error) {
-      console.log("Error loading the data", error);
+      console.error('Error loading data:', error);
+      Alert.alert('Error', 'Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const loadCategoryData = async (category: string) => {
+    console.log('HomeScreen.loadCategoryData called with category:', category);
     try {
       const recipes = await RecipeService.getRecipesByCategory(category);
+      console.log('HomeScreen.loadCategoryData received recipes:', recipes?.length || 0);
       setRecipes(recipes);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading category data:", error);
       setRecipes([]);
     }
   };
 
   const handleCategorySelect = async (category: string) => {
+    console.log('Category selected:', category);
     setSelectedCategory(category);
     await loadCategoryData(category);
   };
@@ -86,9 +95,39 @@ const HomeScreen: React.FC = () => {
     setRefreshing(false);
   };
 
+  const handleLogout = () => {
+    console.log('Logout button pressed');
+    console.log('signOut function:', typeof signOut);
+    setProfileMenuVisible(false);
+    
+    // Direct signOut call without Alert to test if Alert is the issue
+    const performLogout = async () => {
+      try {
+        console.log('Starting logout process...');
+        console.log('signOut function type:', typeof signOut);
+        if (typeof signOut === 'function') {
+          await signOut();
+          console.log('SignOut completed, navigating to sign-in...');
+          router.replace('/(auth)/sign-in');
+        } else {
+          console.error('signOut is not a function:', signOut);
+        }
+      } catch (error: any) {
+        console.error('Logout error:', error);
+        Alert.alert('Error', 'Failed to logout. Please try again.');
+      }
+    };
+    
+    // Skip Alert for testing
+    performLogout();
+  };
+
   useEffect(() => {
-    loadData();
-  }, []);
+    // Wait for auth to be initialized before loading data
+    if (!authLoading) {
+      loadData();
+    }
+  }, [authLoading]);
 
   if (loading && !refreshing)
     return <LoadingSpinner message="Loading delicious recipes..." />;
@@ -108,7 +147,10 @@ const HomeScreen: React.FC = () => {
       >
         {/* HEADER WITH PROFILE AND NOTIFICATION ICONS */}
         <View style={homeStyles.welcomeSection}>
-          <TouchableOpacity style={homeStyles.iconButton}>
+          <TouchableOpacity 
+            style={homeStyles.iconButton}
+            onPress={() => setProfileMenuVisible(true)}
+          >
             <Ionicons name="person-outline" size={24} color={COLORS.text} />
           </TouchableOpacity>
           <TouchableOpacity style={homeStyles.iconButton}>
@@ -116,6 +158,31 @@ const HomeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         
+        {/* Profile Menu Modal */}
+        <Modal
+          visible={profileMenuVisible}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setProfileMenuVisible(false)}
+        >
+          <TouchableOpacity 
+            style={homeStyles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setProfileMenuVisible(false)}
+          >
+            <View style={homeStyles.profileMenu}>
+              <TouchableOpacity 
+                style={homeStyles.profileMenuItem}
+                onPress={handleLogout}
+              >
+                <Ionicons name="log-out-outline" size={24} color={COLORS.text} />
+                <Text style={homeStyles.profileMenuItemText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+        
+
         {/* TITLE SECTION */}
         <View style={homeStyles.titleSection}>
           <Text style={homeStyles.welcomeText}>Recipe Finder</Text>
