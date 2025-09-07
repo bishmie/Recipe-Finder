@@ -2,22 +2,18 @@ import React, { createContext, useState, useEffect, useContext, ReactNode } from
 import { User } from 'firebase/auth';
 import { auth, signInWithEmail, signUpWithEmail, signOutUser } from '../services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { UserService } from '../services/userService';
-import { UserProfile, ADMIN_CREDENTIALS } from '../types/user';
+import { ADMIN_CREDENTIALS } from '../types/user';
 
 interface AuthContextType {
   user: User | null;
-  userProfile: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<User>;
   signUp: (email: string, password: string, displayName?: string) => Promise<User>;
   signOut: () => Promise<void>;
-  refreshUserProfile: () => Promise<void>;
-  updateUserProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -33,7 +29,6 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -42,25 +37,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setUser(currentUser);
       
       if (currentUser) {
-        try {
-          // Load user profile
-          const profile = await UserService.getUserProfile(currentUser.uid);
-          setUserProfile(profile);
-          setIsAdmin(profile?.role === 'admin' || currentUser.email === ADMIN_CREDENTIALS.email);
-          
-          // Update last login time
-          if (profile) {
-            await UserService.updateUserProfile(currentUser.uid, {
-              lastLoginAt: new Date()
-            });
-          }
-        } catch (error) {
-          console.error('Error loading user profile:', error);
-          setUserProfile(null);
-          setIsAdmin(false);
-        }
+        // Simple admin check based on email
+        setIsAdmin(currentUser.email === ADMIN_CREDENTIALS.email);
       } else {
-        setUserProfile(null);
         setIsAdmin(false);
       }
       
@@ -77,59 +56,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signUp = async (email: string, password: string, displayName?: string) => {
     const user = await signUpWithEmail(email, password);
-    
-    // Create user profile in Firestore
-    try {
-      const profile = await UserService.createUserProfile(user, { displayName });
-      setUserProfile(profile);
-      setIsAdmin(profile.role === 'admin');
-    } catch (error) {
-      console.error('Error creating user profile:', error);
-    }
-    
     return user;
   };
 
-  const logout = async () => {
+  const signOut = async () => {
     await signOutUser();
-    setUserProfile(null);
-    setIsAdmin(false);
-  };
-
-  const refreshUserProfile = async () => {
-    if (user) {
-      try {
-        const profile = await UserService.getUserProfile(user.uid);
-        setUserProfile(profile);
-        setIsAdmin(profile?.role === 'admin' || user.email === ADMIN_CREDENTIALS.email);
-      } catch (error) {
-        console.error('Error refreshing user profile:', error);
-      }
-    }
-  };
-
-  const updateUserProfile = async (updates: Partial<UserProfile>) => {
-    if (user && userProfile) {
-      try {
-        await UserService.updateUserProfile(user.uid, updates);
-        setUserProfile({ ...userProfile, ...updates });
-      } catch (error) {
-        console.error('Error updating user profile:', error);
-        throw error;
-      }
-    }
   };
 
   const value = {
     user,
-    userProfile,
     loading,
     isAdmin,
     signIn,
     signUp,
-    signOut: logout,
-    refreshUserProfile,
-    updateUserProfile,
+    signOut,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
