@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 
 import { useEffect } from "react";
 import { View, StyleSheet } from "react-native";
@@ -36,20 +35,3 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 });
-=======
-import { Text, View } from "react-native";
-
-export default function Index() {
-  return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <Text>Edit app/index.tsx to edit this screen.</Text>
-    </View>
-  );
-}
->>>>>>> 3fa1aac7fb24ab97d1b89fb959709588ba045312
