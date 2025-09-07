@@ -125,6 +125,5 @@ export const signOutUser = async (): Promise<void> => {
   }
 };
 
-// Export auth for direct access
 
 export { auth, db };
