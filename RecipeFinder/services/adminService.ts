@@ -16,6 +16,7 @@ import {
 import { db, auth } from './firebase';
 import { PendingRecipe } from './pendingRecipeService';
 import { PublishedRecipe } from './publishedRecipeService';
+import { NotificationService } from './notificationService';
 
 // Collections
 const PENDING_RECIPES_COLLECTION = 'recipes_pending';
@@ -182,6 +183,13 @@ export const AdminService = {
       // Commit the batch
       await batch.commit();
       
+      // Send notification to recipe owner about approval
+      try {
+        await NotificationService.sendRecipeApprovedNotification(pendingData.ownerId, pendingData.title);
+      } catch (notificationError) {
+        console.warn('Failed to send approval notification:', notificationError);
+      }
+      
       console.log(`Recipe ${pendingId} approved by admin ${adminId}`);
     } catch (error: any) {
       console.error('Error approving recipe:', error);
@@ -232,6 +240,17 @@ export const AdminService = {
       
       // Commit the batch
       await batch.commit();
+      
+      // Send notification to recipe owner about decline with reason
+      try {
+        await NotificationService.sendRecipeDeclinedNotification(
+          pendingData.ownerId, 
+          pendingData.title, 
+          reason || 'No reason provided'
+        );
+      } catch (notificationError) {
+        console.warn('Failed to send decline notification:', notificationError);
+      }
       
       console.log(`Recipe ${pendingId} declined by admin ${adminId}${reason ? ` - Reason: ${reason}` : ''}`);
     } catch (error: any) {

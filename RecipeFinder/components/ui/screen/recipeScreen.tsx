@@ -3,11 +3,12 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity, View, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { recipeDetailStyles } from '../../../assets/styles/recipe-detail.styles';
 import { COLORS } from '../../../constants/colors';
 import { Recipe, RecipeService } from '../../../services/recipeService';
+import { FavoritesService } from '../../../services/favoritesService';
 
 export default function RecipeScreen() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function RecipeScreen() {
   const [checkedIngredients, setCheckedIngredients] = useState<Set<number>>(new Set());
   const [isFavorite, setIsFavorite] = useState(false);
 
-  // Load recipe data
+  // Load recipe data and check favorite status
   React.useEffect(() => {
     const loadRecipe = async () => {
       if (!id) {
@@ -34,6 +35,9 @@ export default function RecipeScreen() {
           setError('Recipe not found');
         } else {
           setRecipe(recipeData);
+          // Check if recipe is in favorites
+          const isFav = await FavoritesService.isRecipeFavorite(recipeData.id);
+          setIsFavorite(isFav);
         }
       } catch (err: any) {
         setError(`Failed to load recipe: ${err?.message || 'Unknown error'}`);
@@ -73,8 +77,29 @@ export default function RecipeScreen() {
   };
 
   // Toggle favorite status
-  const toggleFavorite = () => {
-    setIsFavorite(!isFavorite);
+  const toggleFavorite = async () => {
+    if (!recipe) return;
+
+    try {
+      const newFavoriteStatus = await FavoritesService.toggleFavorite(recipe);
+      setIsFavorite(newFavoriteStatus);
+      
+      // Show feedback to user
+      Alert.alert(
+        newFavoriteStatus ? 'Added to Favorites' : 'Removed from Favorites',
+        newFavoriteStatus 
+          ? `${recipe.title} has been added to your favorites.`
+          : `${recipe.title} has been removed from your favorites.`,
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      console.error('Error toggling favorite:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to update favorites. Please try again.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   // Handle back navigation

@@ -13,6 +13,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
+import { NotificationService } from './notificationService';
 
 // Collections
 const PENDING_RECIPES_COLLECTION = 'recipes_pending';
@@ -65,6 +66,13 @@ export const PendingRecipeService = {
       };
 
       const docRef = await addDoc(collection(db, PENDING_RECIPES_COLLECTION), pendingRecipe);
+      
+      // Send notification to admins about new recipe submission
+      try {
+        await NotificationService.sendNewRecipeNotificationToAdmins(recipeData.title, userId);
+      } catch (notificationError) {
+        console.warn('Failed to send new recipe notification to admins:', notificationError);
+      }
       
       return {
         id: docRef.id,
