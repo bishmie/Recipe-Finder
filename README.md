@@ -3,7 +3,8 @@ FoodCoast
 FoodCoast is a mobile application built with React Native that provides authentic recipes. Users can add and browse recipes, view ingredients, follow step-by-step cooking instructions, filter recipes by category, and save their favorites.
 
 
-User Features
+
+👤 User Features
 
 Secure Access: Users can sign up, log in, and log out with Firebase authentication.
 
@@ -18,12 +19,14 @@ Save Favorites: Mark and keep recipes you love for easy access.
 Search & Filter: Quickly find recipes by name or narrow down by category.
 
 
-Admin Features
+
+🛠️ Admin Features
 
 Recipe Control: Create, edit, and delete recipes easily.
 
 
-Tech Stack
+
+📱 Tech Stack
 
 React Native – Frontend mobile app framework
 
@@ -32,7 +35,8 @@ Firebase – Authentication, Firestore database, and storage
 Expo / React Native CLI – For development and testing
 
 
-How to Run the Project
+
+🚀 How to Run the Project
 
 Prerequisites
 
