@@ -41,13 +41,21 @@ Expo / React Native CLI – For development and testing
 Prerequisites
 
 Install Node.js
+
 Install Expo CLI or React Native CLI
+
 Install Git
+
 Firebase project set up
 
+
 Clone the repository :   https://github.com/bishmie/Recipe-Finder.git 
+
 Install dependencies : npm install
+
 Run the app : npm start / expo start
+
+
 
 Youtube Demo Video : https://youtu.be/L3rEowKOgf0?si=fOHPsbx_ZtLPJKtW
 
